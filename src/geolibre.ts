@@ -18,7 +18,7 @@ function openImporter(app: GeoLibreAppAPI): void {
 export const plugin: GeoLibrePlugin = {
   id: "kml-kmz-import",
   name: "KML / KMZ Import",
-  version: "0.1.0",
+  version: "0.1.1",
   activate(app) {
     panel = new ImportPanel(app);
     disposePanel = app.registerRightPanel?.({

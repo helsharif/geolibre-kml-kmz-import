@@ -11,34 +11,28 @@ function slug(value: string): string {
 
 function styledFeature(feature: Feature<Geometry, KmlFeatureProperties>): Feature<Geometry, KmlFeatureProperties> {
   const style = feature.properties.__kmlStyle;
+  const properties: KmlFeatureProperties = {
+    ...feature.properties,
+    __kmlFillColor: style?.polyColor?.hex ?? "#3b82f6",
+    __kmlFillOpacity: style?.fill === false ? 0 : style?.polyColor?.opacity ?? 0.35,
+    __kmlLineColor: style?.lineColor?.hex ?? "#2563eb",
+    __kmlLineOpacity: style?.lineColor?.opacity ?? 1,
+    __kmlLineWidth: style?.lineWidth ?? 2,
+    __kmlPointColor: style?.labelColor?.hex ?? "#e11d48",
+    __kmlPointOpacity: style?.labelColor?.opacity ?? 1,
+    __kmlPointRadius: Math.max(3, 6 * (style?.iconScale ?? 1)),
+  };
+  if (style?.iconHref) properties.__kmlIconHref = style.iconHref;
   return {
     ...feature,
-    properties: {
-      ...feature.properties,
-      __kmlFillColor: style?.polyColor?.hex ?? "#3b82f6",
-      __kmlFillOpacity: style?.fill === false ? 0 : style?.polyColor?.opacity ?? 0.35,
-      __kmlLineColor: style?.lineColor?.hex ?? "#2563eb",
-      __kmlLineOpacity: style?.lineColor?.opacity ?? 1,
-      __kmlLineWidth: style?.lineWidth ?? 2,
-      __kmlPointColor: style?.iconHref ? "#ffffff" : style?.labelColor?.hex ?? "#e11d48",
-      __kmlPointOpacity: style?.labelColor?.opacity ?? 1,
-      __kmlPointRadius: Math.max(3, 6 * (style?.iconScale ?? 1)),
-      __kmlIconHref: style?.iconHref,
-    },
+    properties,
   };
 }
 
-function groupFeatures(parsed: ParsedKml, warnings: ImportWarning[]): Map<string, Feature<Geometry, KmlFeatureProperties>[]> {
-  const groups = new Map<string, Feature<Geometry, KmlFeatureProperties>[]>();
-  for (const feature of parsed.featureCollection.features) {
-    const key = feature.properties.folderPath || parsed.documentName || feature.properties.sourceFilename;
-    const group = groups.get(key) ?? [];
-    group.push(styledFeature(feature));
-    groups.set(key, group);
-  }
-  if (groups.size <= 30) return groups;
-  warnings.push({ code: "partial-support", message: `${groups.size} folder groups were consolidated into one layer to keep GeoLibre responsive.` });
-  return new Map([[parsed.documentName ?? "Imported KML", [...groups.values()].flat()]]);
+function groupFeatures(parsed: ParsedKml): Map<string, Feature<Geometry, KmlFeatureProperties>[]> {
+  // One GeoLibre store layer per imported file keeps the Layers panel usable.
+  // Original Document/Folder paths remain on every feature as folderPath.
+  return new Map([["Features", parsed.featureCollection.features.map(styledFeature)]]);
 }
 
 async function loadImage(dataUrl: string): Promise<ImageBitmap | HTMLImageElement | undefined> {
@@ -77,7 +71,9 @@ async function addStyledMapLayers(map: MapLike, id: string, collection: FeatureC
     },
     {
       id: `${id}-point`, type: "circle", source: sourceId,
-      filter: ["all", ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false], ["!", ["has", "__kmlIconHref"]]],
+      // Always draw a circle fallback. Remote icons may be blocked by CORS or
+      // the Tauri CSP; hiding the circle made point-only KMZ files look empty.
+      filter: ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false],
       paint: {
         "circle-color": ["coalesce", ["get", "__kmlPointColor"], "#e11d48"],
         "circle-opacity": ["coalesce", ["get", "__kmlPointOpacity"], 1],
@@ -126,7 +122,7 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
   const map = app.getMap?.() ?? null;
   const importedLayerIds: string[] = [];
   const prefix = `kml-${Date.now()}-${++importSequence}`;
-  const groups = groupFeatures(parsed, warnings);
+  const groups = groupFeatures(parsed);
   let groupIndex = 0;
   for (const [name, features] of groups) {
     const collection: FeatureCollection<Geometry, KmlFeatureProperties> = { type: "FeatureCollection", features };
@@ -177,6 +173,16 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
   if (bounds.length) {
     const union = bounds.reduce<[number, number, number, number]>((total, item) => [Math.min(total[0], item[0]), Math.min(total[1], item[1]), Math.max(total[2], item[2]), Math.max(total[3], item[3])], [Infinity, Infinity, -Infinity, -Infinity]);
     app.fitBounds?.(union);
+  }
+  if (importedLayerIds.length > 0) {
+    if (app.addLayerGroup) {
+      app.addLayerGroup(sourceFilename, importedLayerIds);
+    } else if (importedLayerIds.length > 1) {
+      warnings.push({
+        code: "partial-support",
+        message: `GeoLibre's external-plugin API cannot create layer groups yet. “${sourceFilename}” was consolidated where possible; GroundOverlays remain adjacent layers.`,
+      });
+    }
   }
   return { layerIds: importedLayerIds, warnings };
 }

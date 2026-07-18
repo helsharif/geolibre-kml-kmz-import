@@ -2,12 +2,12 @@
 
 A standalone GeoLibre plugin for opening Google Earth `.kml` and `.kmz` files as usable map layers. It imports common 2D geometry, folder metadata, attributes, shared styles, embedded marker icons, GroundOverlays, time data, and selected `gx` extensions while degrading safely when a KML feature cannot be represented by GeoLibre.
 
-Version `0.1.0` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
+Version `0.1.1` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
 
 ## Highlights
 
 - Point, LineString, Polygon (including holes), MultiGeometry, and mixed documents
-- Document/Folder hierarchy retained in `folderPath` and meaningful layer names
+- Document/Folder hierarchy retained in `folderPath`, with one organized vector layer per imported file
 - `ExtendedData`, `Data`, `SchemaData`, `SimpleData`, names, descriptions, addresses, visibility, snippets, and source filenames
 - KML `aabbggrr` colors, Style, StyleMap normal state, IconStyle, LabelStyle, LineStyle, and PolyStyle
 - KMZ archives with non-`doc.kml` main documents, nested paths, embedded images, and custom icons
@@ -22,11 +22,11 @@ See [KML_COMPATIBILITY.md](KML_COMPATIBILITY.md) for the detailed matrix.
 
 ## Install in GeoLibre
 
-1. Download `kml-kmz-import-0.1.0.zip` from the repository release or build it as described below.
+1. Download `kml-kmz-import-0.1.1.zip` from the repository release or build it as described below.
 2. Open GeoLibre.
 3. Open **Settings → Manage Plugins → Settings**.
 4. Select **Install from file**.
-5. Choose `kml-kmz-import-0.1.0.zip`.
+5. Choose `kml-kmz-import-0.1.1.zip`.
 6. Activate **KML / KMZ Import** from the Plugins menu if it is not already active.
 7. Use the **KML / KMZ** toolbar menu, the small **KML** map button, or the importer panel.
 
@@ -56,7 +56,7 @@ npm run validate:package
 The installable archive is written to:
 
 ```text
-geolibre-plugin/kml-kmz-import-0.1.0.zip
+geolibre-plugin/kml-kmz-import-0.1.1.zip
 ```
 
 `npm run package:geolibre` runs the production build first. The bundle is a self-contained ESM entry; GeoLibre's external-plugin loader does not resolve relative JavaScript imports inside the ZIP.
@@ -108,7 +108,7 @@ Browser engines differ from jsdom. Parsing currently runs on the UI thread; very
 ## Known limitations
 
 - GeoLibre has no native arbitrary georeferenced image registration helper. GroundOverlays use `getMap()` and a MapLibre image source, then register the existing layer with GeoLibre. They work in the current session, but exact project restore and style-reload persistence depend on host support.
-- KML folder groups become layer names and `folderPath` metadata; the API does not expose nested layer groups. More than 30 folders are consolidated into one layer.
+- GeoLibre's core supports layer groups, but the current external-plugin API does not expose group creation. The plugin creates one vector layer per imported file and keeps every KML folder path in feature attributes. GroundOverlays remain adjacent layers. A forward-compatible `addLayerGroup` hook creates a real file-named group when a future host exposes it.
 - Data-driven KML paint and custom icons are created directly in MapLibre. Older GeoLibre hosts receive default vector styling.
 - Rotated LatLonBox overlays use a geographic-coordinate approximation. `gx:LatLonQuad` is exact in 2D.
 - Remote relative assets inside a fetched NetworkLink are not resolved in v0.1.

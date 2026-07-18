@@ -55,6 +55,11 @@ export interface GeoLibreAppAPI {
   removeMapControl(control: GeoLibreControl): void;
   registerExternalNativeLayer?(layer: ExternalLayerRegistration): void;
   unregisterExternalNativeLayer?(id: string): void;
+  /**
+   * Forward-compatible layer-group hook. GeoLibre's core store supports groups,
+   * but this is not yet exposed by the current public external-plugin API.
+   */
+  addLayerGroup?(name?: string, layerIds?: string[]): string;
   registerRightPanel?(panel: PanelRegistration): () => void;
   unregisterRightPanel?(id: string): void;
   openRightPanel?(id: string): boolean;

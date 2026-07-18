@@ -5,7 +5,7 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 | KML concept | Status | v0.1 behavior |
 |---|---:|---|
 | Document | ✅ | Name and descendants imported; hierarchy retained in paths |
-| Folder / nested Folder | ✅ | Retained as `folderPath` and layer names; no native nested layer groups |
+| Folder / nested Folder | ✅ | Retained as `folderPath`; current external-plugin API cannot create native groups, so vectors are consolidated per imported file |
 | Placemark | ✅ | Metadata and all supported child geometries imported independently |
 | Point | ✅ | Longitude/latitude and optional altitude retained |
 | LineString | ✅ | Coordinates and altitude mode retained |
