@@ -38,6 +38,7 @@ Tests generate KMZ archives in memory for custom icons, non-`doc.kml` entry sele
 | 18 | 3D Model / COLLADA | `unsupported-model.kml` | Metadata report; supported point still loads |
 | 19 | Large feature collection | Generated 10,000-point test and ignored corpus | Completes within benchmark threshold |
 | 20 | Malformed/archive edge cases | Inline and generated ZIP tests | Helpful rejection; no crash |
+| 21 | Global and dateline GroundOverlay | Generated bounds plus ignored Dynamic Earth corpus | Image is cropped into globe-safe tiles under one logical layer |
 
 ## Optional public samples
 

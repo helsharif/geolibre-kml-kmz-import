@@ -35,5 +35,10 @@ describe("provided real-world examples", () => {
         expect(minahasa?.properties).toMatchObject({ Place: "Minahasa, Sulawesi, Indonesia", "Depth km": "96", Magnitude: "5.9" });
         expect(minahasa?.geometry).toEqual({ type: "Point", coordinates: [120.681, 0.109, 27979.079284] });
       }
+      if (name === "dynamic_earth_kmz_file.v2.kmz") {
+        const seafloorAge = parsed.overlays.find((overlay) => overlay.name === "Seafloor Age");
+        expect(seafloorAge).toMatchObject({ bounds: [-179.9999999999, -72, 179.9999999999, 89.99999990000001], visible: false, drawOrder: 2 });
+        expect(seafloorAge?.imageUrl).toMatch(/^data:image\/png;base64,/);
+      }
   }, 120_000);
 });

@@ -141,7 +141,7 @@ export async function parseKml(xml: string, options: ParseOptions): Promise<Pars
         }
         for (const modelElement of childrenNamed(child, "Model")) models.push(parseModel(modelElement, child, folderPath));
       } else if (name === "GroundOverlay") {
-        overlays.push(await parseGroundOverlay(child, folderPath, options, warnings));
+        overlays.push(await parseGroundOverlay(child, folderPath, options, warnings, containerVisible));
       } else if (name === "NetworkLink") {
         networkLinks.push(parseNetworkLink(child, folderPath));
       }

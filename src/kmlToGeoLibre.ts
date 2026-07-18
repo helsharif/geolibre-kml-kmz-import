@@ -2,6 +2,7 @@ import type { Feature, FeatureCollection, Geometry, GeometryCollection, Position
 import type { GeoLibreAppAPI, MapLike } from "./host-api";
 import { registerKmlFeatureInfo, showKmlFeatureInfo } from "./featureInfo";
 import { boundsOfGeometry } from "./geometry";
+import { materializeGroundOverlayTiles } from "./groundOverlayTiles";
 import type { ImportWarning, KmlFeatureProperties, KmlStyle, ParsedKml } from "./types";
 
 let importSequence = 0;
@@ -521,7 +522,13 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
       if (!app.registerExternalNativeLayer) warnings.push({ code: "partial-support", message: "This GeoLibre host does not expose styled external-layer registration; default vector styling was used." });
     }
   }
-  const sortedOverlays = [...parsed.overlays].sort((a, b) => a.drawOrder - b.drawOrder);
+  const visibleOverlays = options.includeHiddenFeatures ? parsed.overlays : parsed.overlays.filter((overlay) => overlay.visible !== false);
+  const hiddenOverlayCount = parsed.overlays.length - visibleOverlays.length;
+  if (hiddenOverlayCount) warnings.push({
+    code: "partial-support",
+    message: `${hiddenOverlayCount.toLocaleString()} GroundOverlay${hiddenOverlayCount === 1 ? " was" : "s were"} marked hidden by the KML and not drawn. Enable “Include items marked hidden” to import ${hiddenOverlayCount === 1 ? "it" : "them"} too.`,
+  });
+  const sortedOverlays = [...visibleOverlays].sort((a, b) => a.drawOrder - b.drawOrder);
   for (let index = 0; index < sortedOverlays.length; index += 1) {
     const overlay = sortedOverlays[index]!;
     if (!map || !overlay.imageUrl || !overlay.coordinates) {
@@ -529,23 +536,35 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
       continue;
     }
     const id = `${prefix}-overlay-${index}`;
-    const sourceId = `${id}-source`;
+    const nativeLayerIds: string[] = [];
+    const sourceIds: string[] = [];
     try {
-      map.addSource(sourceId, { type: "image", url: overlay.imageUrl, coordinates: overlay.coordinates });
-      map.addLayer({ id, type: "raster", source: sourceId, paint: { "raster-opacity": overlay.opacity } });
+      const tiles = await materializeGroundOverlayTiles(overlay, loadImage);
+      if (!tiles.length) throw new Error("the image or geographic bounds are invalid");
+      for (let tileIndex = 0; tileIndex < tiles.length; tileIndex += 1) {
+        const tile = tiles[tileIndex]!;
+        const tileId = tileIndex === 0 ? id : `${id}-tile-${tileIndex}`;
+        const sourceId = tileIndex === 0 ? `${id}-source` : `${id}-tile-${tileIndex}-source`;
+        map.addSource(sourceId, { type: "image", url: tile.imageUrl, coordinates: tile.coordinates });
+        map.addLayer({ id: tileId, type: "raster", source: sourceId, paint: { "raster-opacity": overlay.opacity } });
+        nativeLayerIds.push(tileId);
+        sourceIds.push(sourceId);
+      }
       app.registerExternalNativeLayer?.({
         id, name: `${sourceFilename} / ${overlay.name}`, type: "raster",
-        source: { type: "image", url: overlay.imageUrl, coordinates: overlay.coordinates },
-        nativeLayerIds: [id], sourceIds: [sourceId], opacity: overlay.opacity,
-        metadata: { sourceKind: "kml-ground-overlay", controlOwnsPaint: true, rotation: overlay.rotation, drawOrder: overlay.drawOrder },
+        source: { type: "image", url: tiles[0]!.imageUrl, coordinates: tiles[0]!.coordinates },
+        nativeLayerIds, sourceIds, opacity: overlay.opacity,
+        metadata: { sourceKind: "kml-ground-overlay", controlOwnsPaint: true, rotation: overlay.rotation, drawOrder: overlay.drawOrder, tileCount: tiles.length },
       });
       importedLayerIds.push(id);
     } catch (error) {
+      for (const layerId of [...nativeLayerIds].reverse()) if (map.getLayer(layerId)) map.removeLayer(layerId);
+      for (const sourceId of [...sourceIds].reverse()) if (map.getSource(sourceId)) map.removeSource(sourceId);
       warnings.push({ code: "partial-support", message: `GroundOverlay “${overlay.name}” could not be added: ${error instanceof Error ? error.message : String(error)}` });
     }
   }
   const bounds = visibleFeatures.map((feature) => boundsOfGeometry(feature.geometry)).filter((value): value is [number, number, number, number] => Boolean(value));
-  for (const overlay of parsed.overlays) if (overlay.bounds) bounds.push(overlay.bounds);
+  for (const overlay of visibleOverlays) if (overlay.bounds) bounds.push(overlay.bounds);
   if (bounds.length) {
     const union = bounds.reduce<[number, number, number, number]>((total, item) => [Math.min(total[0], item[0]), Math.min(total[1], item[1]), Math.max(total[2], item[2]), Math.max(total[3], item[3])], [Infinity, Infinity, -Infinity, -Infinity]);
     app.fitBounds?.(union);

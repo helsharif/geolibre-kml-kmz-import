@@ -7,7 +7,7 @@ import type { KmlFeatureProperties, ParsedKml } from "../src/types";
 function parsed(features: Array<Feature<Geometry, KmlFeatureProperties>>, withOverlay = false): ParsedKml {
   return {
     featureCollection: { type: "FeatureCollection", features },
-    overlays: withOverlay ? [{ name: "Overlay", imageUrl: "data:image/png;base64,AA==", bounds: [0, 0, 2, 2], coordinates: [[0, 2], [2, 2], [2, 0], [0, 0]], rotation: 0, drawOrder: 0, opacity: 1, folderPath: "" }] : [],
+    overlays: withOverlay ? [{ name: "Overlay", imageUrl: "data:image/png;base64,AA==", bounds: [0, 0, 2, 2], coordinates: [[0, 2], [2, 2], [2, 0], [0, 0]], rotation: 0, drawOrder: 0, opacity: 1, folderPath: "", visible: true }] : [],
     networkLinks: [], models: [], warnings: [], documentName: "Document",
     summary: { points: features.length, lines: 0, polygons: 0, groundOverlays: withOverlay ? 1 : 0, folders: 2, styles: 1, models: 0, networkLinks: 0, features: features.length },
   };

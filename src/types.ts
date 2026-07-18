@@ -63,6 +63,7 @@ export interface GroundOverlay {
   drawOrder: number;
   opacity: number;
   folderPath: string;
+  visible: boolean;
 }
 
 export interface NetworkLinkInfo {

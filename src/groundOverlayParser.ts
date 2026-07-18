@@ -26,7 +26,7 @@ function parseLatLonQuad(element: Element): Quad | undefined {
   return upperLeft && upperRight && lowerRight && lowerLeft ? [upperLeft, upperRight, lowerRight, lowerLeft] : undefined;
 }
 
-export async function parseGroundOverlay(element: Element, folderPath: string, options: ParseOptions, warnings: ImportWarning[]): Promise<GroundOverlay> {
+export async function parseGroundOverlay(element: Element, folderPath: string, options: ParseOptions, warnings: ImportWarning[], parentVisible = true): Promise<GroundOverlay> {
   const icon = firstChild(element, "Icon");
   const href = icon ? textOf(icon, "href") : undefined;
   const box = firstChild(element, "LatLonBox");
@@ -57,5 +57,6 @@ export async function parseGroundOverlay(element: Element, folderPath: string, o
     drawOrder: numberOf(element, "drawOrder") ?? 0,
     opacity: color?.opacity ?? 1,
     folderPath,
+    visible: parentVisible && textOf(element, "visibility") !== "0" && textOf(element, "visibility")?.toLowerCase() !== "false",
   };
 }
