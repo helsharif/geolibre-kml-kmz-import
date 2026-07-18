@@ -1,6 +1,6 @@
 import type { Feature, Geometry } from "geojson";
 import { describe, expect, it, vi } from "vitest";
-import type { ExternalLayerRegistration, GeoLibreAppAPI, MapLike } from "../src/host-api";
+import type { ExternalLayerRegistration, GeoLibreAppAPI, GeoLibreDeckGL, MapLike } from "../src/host-api";
 import { addParsedKmlToGeoLibre } from "../src/kmlToGeoLibre";
 import type { KmlFeatureProperties, ParsedKml } from "../src/types";
 
@@ -24,13 +24,33 @@ function point(name: string, folderPath: string, icon = false): Feature<Geometry
   };
 }
 
-function fakeMap(): { map: MapLike; layers: Record<string, unknown>[]; states: Array<{ target: { source: string; id: string | number }; state: Record<string, unknown> }> } {
+function fakeDeckGL(): GeoLibreDeckGL {
+  class FakeLayer {}
+  class FakeMapboxLayer {
+    id = "";
+    type = "custom";
+    constructor(properties: Record<string, unknown>) {
+      Object.assign(this, properties);
+      this.id = String(properties.id);
+      this.type = "custom";
+    }
+  }
+  return {
+    layers: { GeoJsonLayer: FakeLayer, IconLayer: FakeLayer },
+    mapbox: { MapboxLayer: FakeMapboxLayer },
+  } as unknown as GeoLibreDeckGL;
+}
+
+function fakeMap(): { map: MapLike; layers: Record<string, unknown>[]; states: Array<{ target: { source: string; id: string | number }; state: Record<string, unknown> }>; container: HTMLElement } {
   const sources = new Map<string, unknown>();
   const layers: Record<string, unknown>[] = [];
   const states: Array<{ target: { source: string; id: string | number }; state: Record<string, unknown> }> = [];
+  const container = document.createElement("div");
+  const canvas = document.createElement("canvas");
   return {
     layers,
     states,
+    container,
     map: {
       addSource: (id, source) => { sources.set(id, source); },
       getSource: (id) => sources.get(id),
@@ -39,6 +59,8 @@ function fakeMap(): { map: MapLike; layers: Record<string, unknown>[]; states: A
       getLayer: (id) => layers.find((layer) => layer.id === id),
       removeLayer: (id) => { const index = layers.findIndex((layer) => layer.id === id); if (index >= 0) layers.splice(index, 1); },
       setFeatureState: (target, state) => { states.push({ target, state }); },
+      getContainer: () => container,
+      getCanvas: () => canvas,
     },
   };
 }
@@ -68,7 +90,8 @@ describe("GeoLibre layer registration", () => {
     expect(JSON.stringify(circle?.filter)).not.toContain("__kmlIconHref");
     expect(JSON.stringify(circle?.paint)).toContain("feature-state");
     expect(states.some((item) => item.state.pointColor === "#e5df67" && item.state.pointOpacity === 0.9)).toBe(true);
-    expect(addLayerGroup).toHaveBeenCalledWith("points.kmz", result.layerIds);
+    expect(result.layerIds).toHaveLength(1);
+    expect(addLayerGroup).not.toHaveBeenCalled();
   });
 
   it("reports the current host grouping limitation when overlays create adjacent layers", async () => {
@@ -84,35 +107,48 @@ describe("GeoLibre layer registration", () => {
     expect(result.warnings.some((warning) => warning.message.includes("cannot create layer groups"))).toBe(true);
   });
 
-  it("uses GeoLibre native 3D Z rendering, preserves folders, and omits KML-hidden features by default", async () => {
-    const { map } = fakeMap();
+  it("uses one native 3D layer for points and stems, restores point information, and omits hidden features by default", async () => {
+    const { map, layers, container } = fakeMap();
     const registrations: ExternalLayerRegistration[] = [];
     const visible = point("Visible", "Earthquakes / Depth 74 to 161");
     visible.geometry = { type: "Point", coordinates: [120.681, 0.109, 27_979] };
     visible.properties.__kmlVisible = true;
     visible.properties.__kmlStyle = { iconColor: { raw: "ff0000ff", hex: "#ff0000", opacity: 1, css: "rgba(255, 0, 0, 1)" } };
+    visible.properties.Place = "Minahasa, Sulawesi, Indonesia";
+    const stem: Feature<Geometry, KmlFeatureProperties> = {
+      type: "Feature",
+      geometry: { type: "LineString", coordinates: [[120.681, 0.109, 0], [120.681, 0.109, 27_979]] },
+      properties: { name: "Visible stem", folderPath: "Earthquakes / Magnitude 5.8 to 6.2", sourceFilename: "earthquakes.kmz", __kmlVisible: true },
+    };
     const hidden = point("Hidden", "Earthquakes / Depth 0 to 10");
     hidden.geometry = { type: "Point", coordinates: [10, 20, 5_000] };
     hidden.properties.__kmlVisible = false;
     const app = {
       getMap: () => map,
-      getDeckGL: async () => ({}),
+      getDeckGL: async () => fakeDeckGL(),
       registerExternalNativeLayer: (layer: ExternalLayerRegistration) => { registrations.push(layer); },
       fitBounds: vi.fn(),
       addGeoJsonLayer: vi.fn(() => "fallback"),
     } as unknown as GeoLibreAppAPI;
 
-    const result = await addParsedKmlToGeoLibre(app, parsed([visible, hidden]), "earthquakes.kmz");
+    const result = await addParsedKmlToGeoLibre(app, parsed([visible, stem, hidden]), "earthquakes.kmz");
 
     expect(registrations).toHaveLength(1);
-    expect(registrations[0]).toMatchObject({ name: "earthquakes.kmz / Depth 74 to 161", nativeLayerIds: [], opacity: 1 });
+    expect(registrations[0]).toMatchObject({ name: "earthquakes.kmz", opacity: 1 });
+    expect(registrations[0]?.nativeLayerIds).toHaveLength(2);
     expect(registrations[0]?.style).toMatchObject({ elevation3dEnabled: true, elevation3dVerticalScale: 1, fillColor: "#ff0000" });
-    expect(registrations[0]?.geojson?.features).toHaveLength(1);
+    expect(registrations[0]?.geojson?.features).toHaveLength(2);
+    const pointLayer = layers.find((layer) => String(layer.id).endsWith("-3d-points"));
+    expect(pointLayer).toBeDefined();
+    const pointDatum = (pointLayer?.data as Array<{ properties: Record<string, unknown> }>)[0];
+    (pointLayer?.onClick as (info: Record<string, unknown>) => boolean)({ x: 20, y: 30, object: pointDatum });
+    expect(container.querySelector(".kml-feature-card")?.textContent).toContain("Minahasa, Sulawesi, Indonesia");
     expect(result.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(true);
 
     registrations.length = 0;
-    const withHidden = await addParsedKmlToGeoLibre(app, parsed([visible, hidden]), "earthquakes.kmz", { includeHiddenFeatures: true });
-    expect(registrations).toHaveLength(2);
+    const withHidden = await addParsedKmlToGeoLibre(app, parsed([visible, stem, hidden]), "earthquakes.kmz", { includeHiddenFeatures: true });
+    expect(registrations).toHaveLength(1);
+    expect(registrations[0]?.geojson?.features).toHaveLength(3);
     expect(withHidden.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(false);
   });
 });

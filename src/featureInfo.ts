@@ -77,15 +77,25 @@ export function createFeatureInfoCard(properties: Record<string, unknown>, sourc
 
 function showCard(map: MapLike, event: MapLayerMouseEvent, sourceFilename: string): void {
   const feature = event.features?.[0];
+  if (!feature?.properties) return;
+  showKmlFeatureInfo(map, event.point, feature.properties, sourceFilename);
+}
+
+export function showKmlFeatureInfo(
+  map: MapLike,
+  point: { x: number; y: number },
+  properties: Record<string, unknown>,
+  sourceFilename: string,
+): void {
   const container = map.getContainer?.();
-  if (!feature?.properties || !container || map.getCanvas?.().style.cursor === "crosshair") return;
+  if (!container || map.getCanvas?.().style.cursor === "crosshair") return;
   activeCards.get(map)?.remove();
-  const card = createFeatureInfoCard(feature.properties, sourceFilename);
+  const card = createFeatureInfoCard(properties, sourceFilename);
   card.style.visibility = "hidden";
   container.append(card);
   const margin = 12;
-  const desiredLeft = event.point.x + margin;
-  const desiredTop = event.point.y + margin;
+  const desiredLeft = point.x + margin;
+  const desiredTop = point.y + margin;
   card.style.left = `${Math.max(margin, Math.min(desiredLeft, container.clientWidth - card.offsetWidth - margin))}px`;
   card.style.top = `${Math.max(margin, Math.min(desiredTop, container.clientHeight - card.offsetHeight - margin))}px`;
   card.style.visibility = "visible";

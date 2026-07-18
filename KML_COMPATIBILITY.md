@@ -5,14 +5,14 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 | KML concept | Status | v0.2 behavior |
 |---|---:|---|
 | Document | ✅ | Name and descendants imported; hierarchy retained in paths |
-| Folder / nested Folder | ✅ | Retained as a readable `Folder` field; altitude-bearing files use separate folder layers; current external-plugin API cannot create their parent group |
+| Folder / nested Folder | ✅ | Retained as a readable `Folder` field inside one consolidated file-named vector layer |
 | Placemark | ✅ | Metadata and all supported child geometries imported independently |
 | Point | ✅ | Longitude/latitude and optional altitude retained |
 | LineString | ✅ | Coordinates and altitude mode retained |
 | LinearRing | ✅ | Used for Polygon outer and inner boundaries |
 | Polygon | ✅ | Outer ring and all valid holes retained |
 | MultiGeometry | ✅ | Like geometries combined; mixed geometries emitted as sibling features with shared attributes |
-| Geometry altitude | ✅ | Nonzero Z values and ground stems use GeoLibre's native deck.gl-backed 3D renderer; older hosts fall back to 2D without discarding Z |
+| Geometry altitude | ✅ | Nonzero Z values, billboard point symbols, and ground stems use GeoLibre's host-provided deck.gl modules; older hosts fall back to 2D without discarding Z |
 | tessellate / extrude | 🟡 | Original geometry remains usable; 3D display semantics not reproduced |
 | name, address, phoneNumber, snippet | ✅ | GeoJSON properties |
 | visibility / open | 🟡 | Effective Document/Folder/Placemark visibility is honored by default; hidden features can be included from the importer; `open` is preserved as a property |

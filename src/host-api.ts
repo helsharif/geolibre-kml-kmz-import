@@ -52,6 +52,16 @@ export interface ExternalLayerRegistration {
   sourcePath?: string;
 }
 
+export interface GeoLibreDeckGL {
+  layers: {
+    GeoJsonLayer: new (properties: Record<string, unknown>) => unknown;
+    IconLayer: new (properties: Record<string, unknown>) => unknown;
+  };
+  mapbox: {
+    MapboxLayer: new (properties: Record<string, unknown>) => Record<string, unknown>;
+  };
+}
+
 export interface PanelRegistration {
   id: string;
   title: string;
@@ -64,7 +74,7 @@ export interface GeoLibreAppAPI {
   addGeoJsonLayer(name: string, data: FeatureCollection, sourcePath?: string): string;
   fitBounds?(bounds: [number, number, number, number]): void;
   getMap?(): MapLike | null;
-  getDeckGL?(): Promise<unknown>;
+  getDeckGL?(): Promise<GeoLibreDeckGL>;
   addMapControl(control: GeoLibreControl, position?: MapControlPosition): boolean;
   removeMapControl(control: GeoLibreControl): void;
   registerExternalNativeLayer?(layer: ExternalLayerRegistration): void;
