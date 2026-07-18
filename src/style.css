@@ -1,0 +1,50 @@
+.kml-import-control button {
+  width: auto !important;
+  min-width: 34px;
+  padding: 0 5px !important;
+  color: hsl(var(--foreground));
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.kml-import-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  color: hsl(var(--foreground));
+  font: 13px/1.45 system-ui, sans-serif;
+}
+
+.kml-import-panel p { margin: 0; }
+
+.kml-import-dropzone {
+  min-height: 96px;
+  padding: 18px;
+  border: 2px dashed hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / .35);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+}
+
+.kml-import-dropzone:hover,
+.kml-import-dropzone.is-dragging {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary) / .08);
+}
+
+.kml-import-option { display: flex; gap: 7px; align-items: flex-start; }
+.kml-import-option input { margin-top: 3px; }
+.kml-import-note { color: hsl(var(--muted-foreground)); font-size: 11px; }
+.kml-import-status { min-height: 20px; font-weight: 600; }
+.kml-import-status[data-kind="success"] { color: #15803d; }
+.kml-import-status[data-kind="error"] { color: #b91c1c; }
+.kml-import-results h3 { margin: 4px 0 6px; font-size: 14px; }
+.kml-import-results ul { margin: 4px 0; padding-left: 20px; }
+.kml-import-results details { margin-top: 10px; }
+.kml-import-results summary { cursor: pointer; font-weight: 650; }

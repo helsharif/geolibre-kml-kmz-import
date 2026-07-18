@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Overlay</name>
+  <GroundOverlay><name>Map image</name><color>80ffffff</color><drawOrder>2</drawOrder><Icon><href>files/map.png</href></Icon><LatLonBox><north>45</north><south>40</south><east>-70</east><west>-80</west><rotation>15</rotation></LatLonBox></GroundOverlay>
+</Document></kml>

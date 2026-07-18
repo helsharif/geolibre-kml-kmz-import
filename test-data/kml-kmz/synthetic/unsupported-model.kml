@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Mixed model</name>
+  <Placemark><name>Usable point</name><Point><coordinates>10,20</coordinates></Point></Placemark>
+  <Placemark><name>Building</name><Model><altitudeMode>absolute</altitudeMode><Location><longitude>10</longitude><latitude>20</latitude><altitude>50</altitude></Location><Orientation><heading>90</heading></Orientation><Scale><x>2</x><y>2</y><z>2</z></Scale><Link><href>models/building.dae</href></Link></Model></Placemark>
+</Document></kml>

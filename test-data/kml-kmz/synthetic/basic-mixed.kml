@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document><name>Basic mixed geometry</name>
+    <Placemark><name>Point A</name><Point><coordinates>-77.0365,38.8977,12</coordinates></Point></Placemark>
+    <Placemark><name>Line A</name><LineString><coordinates>-77.04,38.89 -77.03,38.90</coordinates></LineString></Placemark>
+    <Placemark><name>Polygon A</name><Polygon><outerBoundaryIs><LinearRing><coordinates>-77.05,38.88 -77.01,38.88 -77.01,38.91 -77.05,38.88</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+  </Document>
+</kml>

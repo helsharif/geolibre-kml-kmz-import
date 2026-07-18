@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2"><Document><name>Survey</name>
+  <Schema id="survey"><SimpleField name="depth" type="double"/></Schema>
+  <Style id="normal"><IconStyle><color>ff0000ff</color><scale>1.2</scale><Icon><href>icons/pin.png</href></Icon></IconStyle><LineStyle><color>8000ff00</color><width>3</width></LineStyle></Style>
+  <StyleMap id="map"><Pair><key>normal</key><styleUrl>#normal</styleUrl></Pair></StyleMap>
+  <Folder><name>Day 1</name><Folder><name>Track A</name>
+    <Placemark><name>Observation</name><description><![CDATA[<b>Safe</b><script>alert(1)</script>]]></description><styleUrl>#map</styleUrl>
+      <ExtendedData><Data name="observer"><value>Ada</value></Data><SchemaData schemaUrl="#survey"><SimpleData name="depth">42.5</SimpleData></SchemaData></ExtendedData>
+      <TimeSpan><begin>2026-01-01</begin><end>2026-01-02</end></TimeSpan>
+      <MultiGeometry><Point><coordinates>1,2</coordinates></Point><LineString><coordinates>1,2 3,4</coordinates></LineString></MultiGeometry>
+    </Placemark>
+    <Placemark><name>GPS</name><gx:Track><when>2026-01-01T00:00:00Z</when><when>2026-01-01T00:01:00Z</when><gx:coord>1 2 3</gx:coord><gx:coord>4 5 6</gx:coord></gx:Track></Placemark>
+  </Folder></Folder>
+</Document></kml>
