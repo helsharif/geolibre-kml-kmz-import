@@ -1,5 +1,10 @@
 import type { FeatureCollection } from "geojson";
 
+export interface MapLayerMouseEvent {
+  point: { x: number; y: number };
+  features?: Array<{ properties?: Record<string, unknown> }>;
+}
+
 export type MapControlPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface MapLike {
@@ -12,6 +17,11 @@ export interface MapLike {
   addImage?(id: string, image: ImageBitmap | HTMLImageElement | ImageData): void;
   hasImage?(id: string): boolean;
   removeImage?(id: string): void;
+  setFeatureState?(target: { source: string; id: string | number }, state: Record<string, unknown>): void;
+  on?(type: "click", layerId: string, handler: (event: MapLayerMouseEvent) => void): void;
+  off?(type: "click", layerId: string, handler: (event: MapLayerMouseEvent) => void): void;
+  getContainer?(): HTMLElement;
+  getCanvas?(): HTMLCanvasElement;
 }
 
 export interface GeoLibreControl {

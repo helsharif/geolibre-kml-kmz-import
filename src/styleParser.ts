@@ -21,6 +21,7 @@ export function parseStyle(element: Element): KmlStyle {
   return {
     id: element.getAttribute("id") || undefined,
     iconHref: icon ? textOf(firstChild(icon, "Icon") ?? icon, "href") : undefined,
+    iconColor: icon ? convertKmlColor(textOf(icon, "color")) : undefined,
     iconScale: icon ? numberOf(icon, "scale") : undefined,
     iconHeading: icon ? numberOf(icon, "heading") : undefined,
     labelColor: label ? convertKmlColor(textOf(label, "color")) : undefined,

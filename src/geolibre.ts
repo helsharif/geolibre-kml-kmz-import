@@ -1,4 +1,5 @@
 import type { GeoLibreAppAPI, GeoLibrePlugin, MapControlPosition } from "./host-api";
+import { clearKmlFeatureInfo } from "./featureInfo";
 import { ImportControl } from "./ui/ImportControl";
 import { ImportPanel } from "./ui/ImportPanel";
 import "./style.css";
@@ -18,7 +19,7 @@ function openImporter(app: GeoLibreAppAPI): void {
 export const plugin: GeoLibrePlugin = {
   id: "kml-kmz-import",
   name: "KML / KMZ Import",
-  version: "0.1.1",
+  version: "0.2.0",
   activate(app) {
     panel = new ImportPanel(app);
     disposePanel = app.registerRightPanel?.({
@@ -43,6 +44,7 @@ export const plugin: GeoLibrePlugin = {
     }
   },
   deactivate(app) {
+    clearKmlFeatureInfo(app.getMap?.());
     disposeMenu?.();
     disposeMenu = null;
     disposePanel?.();

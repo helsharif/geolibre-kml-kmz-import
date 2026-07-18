@@ -2,10 +2,10 @@
 
 Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 Experimental
 
-| KML concept | Status | v0.1 behavior |
+| KML concept | Status | v0.2 behavior |
 |---|---:|---|
 | Document | ✅ | Name and descendants imported; hierarchy retained in paths |
-| Folder / nested Folder | ✅ | Retained as `folderPath`; current external-plugin API cannot create native groups, so vectors are consolidated per imported file |
+| Folder / nested Folder | ✅ | Retained as a readable `Folder` field; current external-plugin API cannot create native groups, so vectors are consolidated per imported file |
 | Placemark | ✅ | Metadata and all supported child geometries imported independently |
 | Point | ✅ | Longitude/latitude and optional altitude retained |
 | LineString | ✅ | Coordinates and altitude mode retained |
@@ -16,12 +16,12 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 | tessellate / extrude | 🟡 | Original geometry remains usable; 3D display semantics not reproduced |
 | name, address, phoneNumber, snippet | ✅ | GeoJSON properties |
 | visibility / open | 🟡 | Preserved as properties; initial feature-level visibility/open UI not reproduced |
-| description | ✅ | Sanitized allowlist HTML; escaped plain text for KML over 5 MB |
-| ExtendedData Data/value | ✅ | Nested `extendedData` plus flattened properties |
+| description | ✅ | Two-column HTML tables become clean fields; other HTML is sanitized; escaped plain text for non-tabular descriptions over 5 MB |
+| ExtendedData Data/value | ✅ | Values are flattened for clean Identify cards and exports; raw importer bookkeeping stays private |
 | Schema / SchemaData / SimpleData | ✅ | Values and `schemaUrl` preserved; schema type validation not enforced |
 | Style | ✅ | Common Icon/Label/Line/Poly values parsed and retained |
 | StyleMap | 🟡 | Normal style URL followed; highlight interaction and inline Pair styles not reproduced |
-| IconStyle | 🟡 | Embedded/remote HTTPS image, scale, heading metadata; hotspot/color not fully reproduced |
+| IconStyle | 🟡 | Embedded/remote HTTPS image, color, scale, and heading rendered; hotspot is not yet reproduced |
 | LabelStyle | 🟡 | Color and scale retained; host label rendering is limited |
 | LineStyle | ✅ | Color (including alpha) and width rendered where native-layer API is available |
 | PolyStyle | ✅ | Color, alpha, fill, and outline rendered where available |

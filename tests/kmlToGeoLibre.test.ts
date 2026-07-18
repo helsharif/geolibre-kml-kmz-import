@@ -24,11 +24,13 @@ function point(name: string, folderPath: string, icon = false): Feature<Geometry
   };
 }
 
-function fakeMap(): { map: MapLike; layers: Record<string, unknown>[] } {
+function fakeMap(): { map: MapLike; layers: Record<string, unknown>[]; states: Array<{ target: { source: string; id: string | number }; state: Record<string, unknown> }> } {
   const sources = new Map<string, unknown>();
   const layers: Record<string, unknown>[] = [];
+  const states: Array<{ target: { source: string; id: string | number }; state: Record<string, unknown> }> = [];
   return {
     layers,
+    states,
     map: {
       addSource: (id, source) => { sources.set(id, source); },
       getSource: (id) => sources.get(id),
@@ -36,13 +38,14 @@ function fakeMap(): { map: MapLike; layers: Record<string, unknown>[] } {
       addLayer: (layer) => { layers.push(layer); },
       getLayer: (id) => layers.find((layer) => layer.id === id),
       removeLayer: (id) => { const index = layers.findIndex((layer) => layer.id === id); if (index >= 0) layers.splice(index, 1); },
+      setFeatureState: (target, state) => { states.push({ target, state }); },
     },
   };
 }
 
 describe("GeoLibre layer registration", () => {
   it("keeps icon points visible, consolidates folders, and uses a native group when available", async () => {
-    const { map, layers } = fakeMap();
+    const { map, layers, states } = fakeMap();
     const registrations: ExternalLayerRegistration[] = [];
     const addLayerGroup = vi.fn(() => "group-1");
     const app = {
@@ -57,9 +60,14 @@ describe("GeoLibre layer registration", () => {
 
     expect(registrations).toHaveLength(1);
     expect(registrations[0]?.geojson?.features).toHaveLength(2);
+    const publicProperties = registrations[0]!.geojson!.features[0]!.properties!;
+    expect(publicProperties).toEqual({ name: "A", Folder: "Folder A" });
+    expect(JSON.stringify(publicProperties)).not.toContain("__kml");
     const circle = layers.find((layer) => String(layer.id).endsWith("-point"));
     expect(circle).toBeDefined();
     expect(JSON.stringify(circle?.filter)).not.toContain("__kmlIconHref");
+    expect(JSON.stringify(circle?.paint)).toContain("feature-state");
+    expect(states.some((item) => item.state.pointColor === "#e5df67" && item.state.pointOpacity === 0.9)).toBe(true);
     expect(addLayerGroup).toHaveBeenCalledWith("points.kmz", result.layerIds);
   });
 

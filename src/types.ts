@@ -24,6 +24,7 @@ export interface KmlColor {
 export interface KmlStyle {
   id?: string;
   iconHref?: string;
+  iconColor?: KmlColor;
   iconScale?: number;
   iconHeading?: number;
   labelColor?: KmlColor;

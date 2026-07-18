@@ -1,5 +1,6 @@
 import type { FeatureCollection, Geometry } from "geojson";
 import { combineLikeGeometries, countGeometry, parseGeometryElements } from "./geometry";
+import { extractDescriptionFields } from "./descriptionFields";
 import { parseGroundOverlay } from "./groundOverlayParser";
 import { parseNetworkLink } from "./networkLinkParser";
 import { escapeHtmlAsText, sanitizeHtml } from "./security";
@@ -15,8 +16,13 @@ function baseProperties(element: Element, folderPath: string, options: ParseOpti
   }
   const description = textOf(element, "description");
   if (description) {
-    properties.description = plainTextDescriptions ? escapeHtmlAsText(description) : sanitizeHtml(description);
-    if (plainTextDescriptions) properties.descriptionFormat = "escaped-text";
+    const descriptionFields = extractDescriptionFields(description);
+    if (descriptionFields) {
+      Object.assign(properties, descriptionFields);
+    } else {
+      properties.description = plainTextDescriptions ? escapeHtmlAsText(description) : sanitizeHtml(description);
+      if (plainTextDescriptions) properties.descriptionFormat = "escaped-text";
+    }
   }
   const extendedData = firstChild(element, "ExtendedData");
   if (extendedData) {
@@ -97,7 +103,7 @@ export async function parseKml(xml: string, options: ParseOptions): Promise<Pars
   const documentName = textOf(top, "name");
   const plainTextDescriptions = xml.length > 5 * 1024 * 1024;
   if (plainTextDescriptions && descendantsNamed(root, "description").length > 0) {
-    warnings.push({ code: "partial-support", message: "This large KML uses escaped plain-text descriptions to avoid blocking the UI; HTML formatting was not retained." });
+    warnings.push({ code: "partial-support", message: "Non-tabular descriptions in this large KML use escaped plain text to keep importing responsive; two-column attribute tables are retained as fields." });
   }
 
   const visit = async (container: Element, path: string[]): Promise<void> => {

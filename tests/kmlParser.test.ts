@@ -54,6 +54,14 @@ describe("KML parser", () => {
     expect(result.networkLinks[0]).toMatchObject({ name: "Linked", kind: "https" });
   });
 
+  it("turns Google Earth description tables into clean searchable fields", async () => {
+    const description = `<![CDATA[<table><tr><td>FID</td><td>676</td></tr><tr><td>Site_Name</td><td>Edmonton</td></tr><tr><td>Codes</td><td>&lt;null&gt;</td></tr><tr><td>Reference</td><td>Majorowicz1996;<br/>Majorowicz_et al1999</td></tr></table>]]>`;
+    const result = await parseKml(`<kml><Placemark><name>Edmonton</name><description>${description}</description><Point><coordinates>-113.49,53.54</coordinates></Point></Placemark></kml>`, { sourceFilename: "Canada.kmz" });
+    const properties = result.featureCollection.features[0]!.properties;
+    expect(properties).toMatchObject({ FID: "676", Site_Name: "Edmonton", Codes: "<null>", Reference: "Majorowicz1996;\nMajorowicz_et al1999" });
+    expect(properties.description).toBeUndefined();
+  });
+
   it("preserves per-track timestamps in gx:MultiTrack", async () => {
     const xml = `<kml xmlns:gx="http://www.google.com/kml/ext/2.2"><Placemark><gx:MultiTrack><gx:Track><when>2026-01-01</when><when>2026-01-02</when><gx:coord>0 0</gx:coord><gx:coord>1 1</gx:coord></gx:Track><gx:Track><when>2026-02-01</when><when>2026-02-02</when><gx:coord>2 2</gx:coord><gx:coord>3 3</gx:coord></gx:Track></gx:MultiTrack></Placemark></kml>`;
     const result = await parseKml(xml, { sourceFilename: "multi-track.kml" });
