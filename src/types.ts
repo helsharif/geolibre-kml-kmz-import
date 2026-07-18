@@ -44,6 +44,7 @@ export interface KmlFeatureProperties extends Record<string, unknown> {
   sourceFilename: string;
   styleUrl?: string;
   __kmlStyle?: KmlStyle;
+  __kmlVisible?: boolean;
   altitudeMode?: string;
 }
 

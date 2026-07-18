@@ -16,6 +16,7 @@ An external plugin ZIP contains a root `plugin.json`. `entry` and optional `styl
 | `addGeoJsonLayer` | Compatibility fallback for older hosts |
 | `registerExternalNativeLayer` | First-class styled layers in Layers, with attributes/export data |
 | `getMap` | Per-feature paint, embedded icons, and GroundOverlay image sources |
+| `getDeckGL` | Capability detection for GeoLibre's native deck.gl-backed 3D Z-value rendering |
 | `fitBounds` | Zoom to imported vector/overlay extent |
 
 All optional capabilities are optional-chained and have a fallback or warning.
@@ -24,6 +25,7 @@ All optional capabilities are optional-chained and have a fallback or warning.
 
 - External panels render plain DOM, not a React node, because a plugin does not share the host React instance.
 - GeoLibre's flat external-layer style is not expressive enough for per-feature KML style and icon URLs. The plugin creates data-driven MapLibre paint and marks it `controlOwnsPaint` when the host supports external native layers.
+- Altitude-bearing GeoJSON is registered without custom native MapLibre layer ids and with `elevation3dEnabled`, allowing GeoLibre's normal vector pipeline to hand nonzero Z coordinates and ground stems to its shared deck.gl renderer.
 - The documented raster helpers accept XYZ, WMTS, WMS, and COG—not arbitrary images. GroundOverlay therefore uses a MapLibre `image` source through `getMap`.
 - GeoLibre core has layer groups, but no group creation/membership method is currently exposed to external plugins. The plugin consolidates each file's vectors into one layer, preserves KML folders as feature metadata, and calls a forward-compatible optional `addLayerGroup(name, layerIds)` hook if a future host exposes it.
 - ZIP and URL-installed plugins execute as trusted code. The desktop Content Security Policy can block remote image hosts not present in its allowlist; embedded KMZ images use data URLs and avoid this issue.

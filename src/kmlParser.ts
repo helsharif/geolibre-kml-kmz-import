@@ -106,17 +106,20 @@ export async function parseKml(xml: string, options: ParseOptions): Promise<Pars
     warnings.push({ code: "partial-support", message: "Non-tabular descriptions in this large KML use escaped plain text to keep importing responsive; two-column attribute tables are retained as fields." });
   }
 
-  const visit = async (container: Element, path: string[]): Promise<void> => {
+  const visibleValue = (value: string | undefined): boolean => value !== "0" && value?.toLowerCase() !== "false";
+  const visit = async (container: Element, path: string[], parentVisible: boolean): Promise<void> => {
     const containerName = ["Document", "Folder"].includes(localName(container)) ? textOf(container, "name") : undefined;
     const nextPath = containerName ? [...path, containerName] : path;
     const folderPath = nextPath.join(" / ");
+    const containerVisible = parentVisible && visibleValue(textOf(container, "visibility"));
     if (localName(container) === "Folder" && folderPath) folders.add(folderPath);
     for (const child of Array.from(container.children)) {
       const name = localName(child);
       if (name === "Document" || name === "Folder") {
-        await visit(child, nextPath);
+        await visit(child, nextPath, containerVisible);
       } else if (name === "Placemark") {
         const properties = baseProperties(child, folderPath, options, plainTextDescriptions);
+        properties.__kmlVisible = containerVisible && visibleValue(textOf(child, "visibility"));
         const styleUrl = textOf(child, "styleUrl");
         const style = resolveStyle(styleUrl, firstChild(child, "Style"), catalog);
         if (styleUrl) properties.styleUrl = styleUrl;
@@ -141,7 +144,7 @@ export async function parseKml(xml: string, options: ParseOptions): Promise<Pars
       }
     }
   };
-  await visit(top, []);
+  await visit(top, [], true);
 
   const unsupported: Array<[string, string]> = [
     ["ScreenOverlay", "ScreenOverlay"], ["PhotoOverlay", "PhotoOverlay"], ["Tour", "gx:Tour"],

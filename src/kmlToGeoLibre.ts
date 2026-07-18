@@ -10,10 +10,18 @@ function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50) || "layer";
 }
 
-function groupFeatures(parsed: ParsedKml): Map<string, Feature<Geometry, KmlFeatureProperties>[]> {
-  // One GeoLibre store layer per imported file keeps the Layers panel usable.
-  // Original Document/Folder paths remain on every feature as folderPath.
-  return new Map([["Features", parsed.featureCollection.features]]);
+function groupFeatures(parsed: ParsedKml, features: Feature<Geometry, KmlFeatureProperties>[], preserveFolders: boolean): Map<string, Feature<Geometry, KmlFeatureProperties>[]> {
+  if (!preserveFolders) return new Map([["Features", features]]);
+  const groups = new Map<string, Feature<Geometry, KmlFeatureProperties>[]>();
+  for (const feature of features) {
+    const path = feature.properties.folderPath;
+    const leaf = path.split(" / ").at(-1);
+    const name = !leaf || path === parsed.documentName ? "Features" : leaf;
+    const grouped = groups.get(name) ?? [];
+    grouped.push(feature);
+    groups.set(name, grouped);
+  }
+  return groups;
 }
 
 async function loadImage(dataUrl: string): Promise<ImageBitmap | HTMLImageElement | undefined> {
@@ -33,6 +41,57 @@ async function loadImage(dataUrl: string): Promise<ImageBitmap | HTMLImageElemen
   } catch {
     return undefined;
   }
+}
+
+async function dominantImageColor(href: string | undefined): Promise<string | undefined> {
+  if (!href) return undefined;
+  const image = await loadImage(href);
+  if (!image) return undefined;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.min(128, image.width));
+    canvas.height = Math.max(1, Math.min(128, image.height));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return undefined;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let red = 0;
+    let green = 0;
+    let blue = 0;
+    let totalWeight = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const r = pixels[index] ?? 0;
+      const g = pixels[index + 1] ?? 0;
+      const b = pixels[index + 2] ?? 0;
+      const alpha = pixels[index + 3] ?? 0;
+      if (alpha < 32) continue;
+      const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+      const weight = (alpha / 255) * (1 + chroma / 255);
+      red += r * weight;
+      green += g * weight;
+      blue += b * weight;
+      totalWeight += weight;
+    }
+    if (!totalWeight) return undefined;
+    return `#${[red, green, blue].map((value) => Math.round(value / totalWeight).toString(16).padStart(2, "0")).join("")}`;
+  } catch {
+    return undefined;
+  }
+}
+
+function geometryHasAltitude(geometry: Geometry): boolean {
+  if (geometry.type === "GeometryCollection") return geometry.geometries.some(geometryHasAltitude);
+  let found = false;
+  const visit = (value: unknown): void => {
+    if (found || !Array.isArray(value)) return;
+    if (typeof value[0] === "number" && typeof value[1] === "number") {
+      found = typeof value[2] === "number" && Number.isFinite(value[2]) && value[2] !== 0;
+      return;
+    }
+    for (const child of value) visit(child);
+  };
+  visit(geometry.coordinates);
+  return found;
 }
 
 interface PreparedFeature {
@@ -76,6 +135,22 @@ function prepareFeatures(features: Feature<Geometry, KmlFeatureProperties>[]): P
       },
     };
   });
+}
+
+async function native3dStyle(prepared: PreparedFeature[]): Promise<NonNullable<Parameters<NonNullable<GeoLibreAppAPI["registerExternalNativeLayer"]>>[0]["style"]>> {
+  const point = prepared.find((item) => ["Point", "MultiPoint"].includes(item.feature.geometry.type));
+  const line = prepared.find((item) => ["LineString", "MultiLineString"].includes(item.feature.geometry.type));
+  const pointColor = point?.style?.iconColor?.hex ?? await dominantImageColor(point?.style?.iconHref) ?? "#e5df67";
+  return {
+    fillColor: pointColor,
+    fillOpacity: point?.style?.iconColor?.opacity ?? 0.95,
+    strokeColor: line?.style?.lineColor?.hex ?? pointColor,
+    strokeWidth: line?.style?.lineWidth ?? 1,
+    circleRadius: Math.max(3, 6 * (point?.style?.iconScale ?? 1)),
+    elevation3dEnabled: true,
+    elevation3dVerticalScale: 1,
+    elevation3dOffset: 0,
+  };
 }
 
 async function addStyledMapLayers(map: MapLike, id: string, prepared: PreparedFeature[], warnings: ImportWarning[]): Promise<{ layerIds: string[]; sourceIds: string[]; sourceId: string }> {
@@ -170,17 +245,40 @@ async function addStyledMapLayers(map: MapLike, id: string, prepared: PreparedFe
 
 export interface AddToGeoLibreResult { layerIds: string[]; warnings: ImportWarning[] }
 
-export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: ParsedKml, sourceFilename: string): Promise<AddToGeoLibreResult> {
+export interface AddToGeoLibreOptions { includeHiddenFeatures?: boolean }
+
+export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: ParsedKml, sourceFilename: string, options: AddToGeoLibreOptions = {}): Promise<AddToGeoLibreResult> {
   const warnings = [...parsed.warnings];
   const map = app.getMap?.() ?? null;
   const importedLayerIds: string[] = [];
   const prefix = `kml-${Date.now()}-${++importSequence}`;
-  const groups = groupFeatures(parsed);
+  const allFeatures = parsed.featureCollection.features;
+  const visibleFeatures = options.includeHiddenFeatures ? allFeatures : allFeatures.filter((feature) => feature.properties.__kmlVisible !== false);
+  const hiddenCount = allFeatures.length - visibleFeatures.length;
+  if (hiddenCount) warnings.push({
+    code: "partial-support",
+    message: `${hiddenCount.toLocaleString()} feature${hiddenCount === 1 ? " was" : "s were"} marked hidden by the KML and not drawn. Enable “Include features marked hidden” to import them too.`,
+  });
+  const native3d = Boolean(app.getDeckGL && app.registerExternalNativeLayer && visibleFeatures.some((feature) => geometryHasAltitude(feature.geometry)));
+  const groups = groupFeatures(parsed, visibleFeatures, native3d);
   let groupIndex = 0;
   for (const [name, features] of groups) {
     const prepared = prepareFeatures(features);
     const collection: FeatureCollection<Geometry, Record<string, unknown>> = { type: "FeatureCollection", features: prepared.map((item) => item.feature) };
     const id = `${prefix}-${groupIndex++}-${slug(name)}`;
+    if (native3d && app.registerExternalNativeLayer) {
+      try {
+        app.registerExternalNativeLayer({
+          id, name: `${sourceFilename} / ${name}`, type: "geojson", geojson: collection,
+          nativeLayerIds: [], opacity: 1, style: await native3dStyle(prepared),
+          metadata: { sourceKind: "kml-kmz-import-3d", kmlDocumentName: parsed.documentName, kmlFeatureCount: features.length, kmlAltitudeMode: "native-z" },
+        });
+        importedLayerIds.push(id);
+        continue;
+      } catch (error) {
+        warnings.push({ code: "partial-support", message: `GeoLibre's native 3D Z-value renderer could not register “${name}”; flat styling was used (${error instanceof Error ? error.message : String(error)}).` });
+      }
+    }
     if (map && app.registerExternalNativeLayer) {
       try {
         const native = await addStyledMapLayers(map, id, prepared, warnings);
@@ -226,7 +324,7 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
       warnings.push({ code: "partial-support", message: `GroundOverlay “${overlay.name}” could not be added: ${error instanceof Error ? error.message : String(error)}` });
     }
   }
-  const bounds = parsed.featureCollection.features.map((feature) => boundsOfGeometry(feature.geometry)).filter((value): value is [number, number, number, number] => Boolean(value));
+  const bounds = visibleFeatures.map((feature) => boundsOfGeometry(feature.geometry)).filter((value): value is [number, number, number, number] => Boolean(value));
   for (const overlay of parsed.overlays) if (overlay.bounds) bounds.push(overlay.bounds);
   if (bounds.length) {
     const union = bounds.reduce<[number, number, number, number]>((total, item) => [Math.min(total[0], item[0]), Math.min(total[1], item[1]), Math.max(total[2], item[2]), Math.max(total[3], item[3])], [Infinity, Infinity, -Infinity, -Infinity]);
@@ -238,7 +336,7 @@ export async function addParsedKmlToGeoLibre(app: GeoLibreAppAPI, parsed: Parsed
     } else if (importedLayerIds.length > 1) {
       warnings.push({
         code: "partial-support",
-        message: `GeoLibre's external-plugin API cannot create layer groups yet. “${sourceFilename}” was consolidated where possible; GroundOverlays remain adjacent layers.`,
+        message: `GeoLibre's external-plugin API cannot create layer groups yet. “${sourceFilename}” folder layers remain adjacent in the Layers panel.`,
       });
     }
   }

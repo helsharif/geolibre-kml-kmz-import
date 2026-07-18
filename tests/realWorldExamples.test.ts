@@ -28,5 +28,12 @@ describe("provided real-world examples", () => {
         expect(winnipeg?.properties.description).toBeUndefined();
         expect(winnipeg?.properties.__kmlStyle?.iconHref).toMatch(/^data:image\/png;base64,/);
       }
+      if (name === "AboveSurfaceEQ_depth_as_color.kmz") {
+        const visiblePoints = parsed.featureCollection.features.filter((feature) => feature.geometry.type === "Point" && feature.properties.__kmlVisible !== false);
+        const minahasa = visiblePoints.find((feature) => feature.properties.Time === "2008-10-20T04:54:19.240Z");
+        expect(visiblePoints).toHaveLength(4_884);
+        expect(minahasa?.properties).toMatchObject({ Place: "Minahasa, Sulawesi, Indonesia", "Depth km": "96", Magnitude: "5.9" });
+        expect(minahasa?.geometry).toEqual({ type: "Point", coordinates: [120.681, 0.109, 27979.079284] });
+      }
   }, 120_000);
 });

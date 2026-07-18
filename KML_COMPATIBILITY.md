@@ -5,18 +5,18 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 | KML concept | Status | v0.2 behavior |
 |---|---:|---|
 | Document | ✅ | Name and descendants imported; hierarchy retained in paths |
-| Folder / nested Folder | ✅ | Retained as a readable `Folder` field; current external-plugin API cannot create native groups, so vectors are consolidated per imported file |
+| Folder / nested Folder | ✅ | Retained as a readable `Folder` field; altitude-bearing files use separate folder layers; current external-plugin API cannot create their parent group |
 | Placemark | ✅ | Metadata and all supported child geometries imported independently |
 | Point | ✅ | Longitude/latitude and optional altitude retained |
 | LineString | ✅ | Coordinates and altitude mode retained |
 | LinearRing | ✅ | Used for Polygon outer and inner boundaries |
 | Polygon | ✅ | Outer ring and all valid holes retained |
 | MultiGeometry | ✅ | Like geometries combined; mixed geometries emitted as sibling features with shared attributes |
-| Geometry altitude | 🟡 | Z coordinate and altitude mode retained; 2D rendering |
+| Geometry altitude | ✅ | Nonzero Z values and ground stems use GeoLibre's native deck.gl-backed 3D renderer; older hosts fall back to 2D without discarding Z |
 | tessellate / extrude | 🟡 | Original geometry remains usable; 3D display semantics not reproduced |
 | name, address, phoneNumber, snippet | ✅ | GeoJSON properties |
-| visibility / open | 🟡 | Preserved as properties; initial feature-level visibility/open UI not reproduced |
-| description | ✅ | Two-column HTML tables become clean fields; other HTML is sanitized; escaped plain text for non-tabular descriptions over 5 MB |
+| visibility / open | 🟡 | Effective Document/Folder/Placemark visibility is honored by default; hidden features can be included from the importer; `open` is preserved as a property |
+| description | ✅ | Two-column tables and bold `Key: Value` info windows become clean fields; other HTML is sanitized; escaped plain text for non-tabular descriptions over 5 MB |
 | ExtendedData Data/value | ✅ | Values are flattened for clean Identify cards and exports; raw importer bookkeeping stays private |
 | Schema / SchemaData / SimpleData | ✅ | Values and `schemaUrl` preserved; schema type validation not enforced |
 | Style | ✅ | Common Icon/Label/Line/Poly values parsed and retained |

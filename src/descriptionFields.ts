@@ -47,5 +47,15 @@ export function extractDescriptionFields(html: string): Record<string, string> |
     while (Object.hasOwn(fields, uniqueKey)) uniqueKey = `${key} (${suffix++})`;
     fields[uniqueKey] = value;
   }
+  if (Object.keys(fields).length === 0) {
+    for (const match of html.matchAll(/<b\b[^>]*>([\s\S]*?)<\/b>/gi)) {
+      const text = cellText(match[1] ?? "");
+      const separator = text.indexOf(":");
+      if (separator < 1) continue;
+      const key = text.slice(0, separator).trim();
+      const value = text.slice(separator + 1).trim();
+      if (key && value) fields[key] = value;
+    }
+  }
   return Object.keys(fields).length ? fields : undefined;
 }

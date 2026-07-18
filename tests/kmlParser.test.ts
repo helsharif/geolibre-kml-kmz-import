@@ -62,6 +62,12 @@ describe("KML parser", () => {
     expect(properties.description).toBeUndefined();
   });
 
+  it("extracts bold Google Earth info-window fields and inherits folder visibility", async () => {
+    const result = await parseKml(`<kml><Document><name>Earthquakes</name><Folder><name>Hidden</name><visibility>0</visibility><Placemark><description><![CDATA[<b>Place: Minahasa</b><br><b>Depth km: 96</b>]]></description><Point><altitudeMode>absolute</altitudeMode><coordinates>120.681,0.109,27979</coordinates></Point></Placemark></Folder><Folder><name>Visible</name><Placemark><Point><coordinates>1,2,100</coordinates></Point></Placemark></Folder></Document></kml>`, { sourceFilename: "earthquakes.kmz" });
+    expect(result.featureCollection.features[0]?.properties).toMatchObject({ Place: "Minahasa", "Depth km": "96", __kmlVisible: false });
+    expect(result.featureCollection.features[1]?.properties.__kmlVisible).toBe(true);
+  });
+
   it("preserves per-track timestamps in gx:MultiTrack", async () => {
     const xml = `<kml xmlns:gx="http://www.google.com/kml/ext/2.2"><Placemark><gx:MultiTrack><gx:Track><when>2026-01-01</when><when>2026-01-02</when><gx:coord>0 0</gx:coord><gx:coord>1 1</gx:coord></gx:Track><gx:Track><when>2026-02-01</when><when>2026-02-02</when><gx:coord>2 2</gx:coord><gx:coord>3 3</gx:coord></gx:Track></gx:MultiTrack></Placemark></kml>`;
     const result = await parseKml(xml, { sourceFilename: "multi-track.kml" });

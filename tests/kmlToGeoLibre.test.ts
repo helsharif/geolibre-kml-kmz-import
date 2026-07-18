@@ -83,4 +83,36 @@ describe("GeoLibre layer registration", () => {
     expect(result.layerIds).toHaveLength(2);
     expect(result.warnings.some((warning) => warning.message.includes("cannot create layer groups"))).toBe(true);
   });
+
+  it("uses GeoLibre native 3D Z rendering, preserves folders, and omits KML-hidden features by default", async () => {
+    const { map } = fakeMap();
+    const registrations: ExternalLayerRegistration[] = [];
+    const visible = point("Visible", "Earthquakes / Depth 74 to 161");
+    visible.geometry = { type: "Point", coordinates: [120.681, 0.109, 27_979] };
+    visible.properties.__kmlVisible = true;
+    visible.properties.__kmlStyle = { iconColor: { raw: "ff0000ff", hex: "#ff0000", opacity: 1, css: "rgba(255, 0, 0, 1)" } };
+    const hidden = point("Hidden", "Earthquakes / Depth 0 to 10");
+    hidden.geometry = { type: "Point", coordinates: [10, 20, 5_000] };
+    hidden.properties.__kmlVisible = false;
+    const app = {
+      getMap: () => map,
+      getDeckGL: async () => ({}),
+      registerExternalNativeLayer: (layer: ExternalLayerRegistration) => { registrations.push(layer); },
+      fitBounds: vi.fn(),
+      addGeoJsonLayer: vi.fn(() => "fallback"),
+    } as unknown as GeoLibreAppAPI;
+
+    const result = await addParsedKmlToGeoLibre(app, parsed([visible, hidden]), "earthquakes.kmz");
+
+    expect(registrations).toHaveLength(1);
+    expect(registrations[0]).toMatchObject({ name: "earthquakes.kmz / Depth 74 to 161", nativeLayerIds: [], opacity: 1 });
+    expect(registrations[0]?.style).toMatchObject({ elevation3dEnabled: true, elevation3dVerticalScale: 1, fillColor: "#ff0000" });
+    expect(registrations[0]?.geojson?.features).toHaveLength(1);
+    expect(result.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(true);
+
+    registrations.length = 0;
+    const withHidden = await addParsedKmlToGeoLibre(app, parsed([visible, hidden]), "earthquakes.kmz", { includeHiddenFeatures: true });
+    expect(registrations).toHaveLength(2);
+    expect(withHidden.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(false);
+  });
 });

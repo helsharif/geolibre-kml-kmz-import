@@ -8,6 +8,7 @@ export class ImportPanel {
   private results: HTMLElement | null = null;
   private input: HTMLInputElement | null = null;
   private networkLinks = false;
+  private includeHiddenFeatures = false;
 
   constructor(private readonly app: GeoLibreAppAPI) {}
 
@@ -33,6 +34,12 @@ export class ImportPanel {
     checkbox.type = "checkbox";
     checkbox.addEventListener("change", () => { this.networkLinks = checkbox.checked; });
     networkLabel.append(checkbox, document.createTextNode(" Load linked HTTPS and in-archive KML resources (maximum depth 2)"));
+    const hiddenLabel = document.createElement("label");
+    hiddenLabel.className = "kml-import-option";
+    const hiddenCheckbox = document.createElement("input");
+    hiddenCheckbox.type = "checkbox";
+    hiddenCheckbox.addEventListener("change", () => { this.includeHiddenFeatures = hiddenCheckbox.checked; });
+    hiddenLabel.append(hiddenCheckbox, document.createTextNode(" Include features marked hidden in the KML"));
     const security = document.createElement("p");
     security.className = "kml-import-note";
     security.textContent = "Safety limits: 100 MB input, 2,000 archive files, 250 MB extracted, no scripts or unsafe URL schemes.";
@@ -41,7 +48,7 @@ export class ImportPanel {
     this.status.setAttribute("role", "status");
     this.results = document.createElement("div");
     this.results.className = "kml-import-results";
-    root.append(intro, drop, networkLabel, security, this.status, this.results);
+    root.append(intro, drop, networkLabel, hiddenLabel, security, this.status, this.results);
     container.appendChild(root);
     return () => {
       root.remove();
@@ -81,7 +88,7 @@ export class ImportPanel {
       const parsed = await importKmlKmz(file, { loadNetworkLinks: this.networkLinks, onStatus: (message) => this.setStatus(message) });
       if (parsed.summary.features === 0 && parsed.summary.groundOverlays === 0) throw new Error("No supported geographic features or GroundOverlays were found.");
       this.setStatus(`Adding ${file.name} to GeoLibre…`);
-      const added = await addParsedKmlToGeoLibre(this.app, parsed, file.name);
+      const added = await addParsedKmlToGeoLibre(this.app, parsed, file.name, { includeHiddenFeatures: this.includeHiddenFeatures });
       this.setStatus(`${file.name} imported into ${added.layerIds.length} layer${added.layerIds.length === 1 ? "" : "s"}.`, "success");
       this.renderSummary(parsed.summary, added.warnings);
     } catch (error) {

@@ -44,6 +44,9 @@ export interface ExternalLayerRegistration {
     strokeWidth?: number;
     fillOpacity?: number;
     circleRadius?: number;
+    elevation3dEnabled?: boolean;
+    elevation3dVerticalScale?: number;
+    elevation3dOffset?: number;
   };
   metadata?: Record<string, unknown>;
   sourcePath?: string;
@@ -61,6 +64,7 @@ export interface GeoLibreAppAPI {
   addGeoJsonLayer(name: string, data: FeatureCollection, sourcePath?: string): string;
   fitBounds?(bounds: [number, number, number, number]): void;
   getMap?(): MapLike | null;
+  getDeckGL?(): Promise<unknown>;
   addMapControl(control: GeoLibreControl, position?: MapControlPosition): boolean;
   removeMapControl(control: GeoLibreControl): void;
   registerExternalNativeLayer?(layer: ExternalLayerRegistration): void;
