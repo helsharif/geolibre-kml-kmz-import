@@ -22,6 +22,7 @@ export interface MapLike {
   off?(type: "click", layerId: string, handler: (event: MapLayerMouseEvent) => void): void;
   getContainer?(): HTMLElement;
   getCanvas?(): HTMLCanvasElement;
+  queryTerrainElevation?(lngLat: [number, number], options?: { exaggerated?: boolean }): number | null | undefined;
 }
 
 export interface GeoLibreControl {

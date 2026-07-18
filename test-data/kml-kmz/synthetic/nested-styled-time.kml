@@ -9,6 +9,6 @@
       <TimeSpan><begin>2026-01-01</begin><end>2026-01-02</end></TimeSpan>
       <MultiGeometry><Point><coordinates>1,2</coordinates></Point><LineString><coordinates>1,2 3,4</coordinates></LineString></MultiGeometry>
     </Placemark>
-    <Placemark><name>GPS</name><gx:Track><when>2026-01-01T00:00:00Z</when><when>2026-01-01T00:01:00Z</when><gx:coord>1 2 3</gx:coord><gx:coord>4 5 6</gx:coord></gx:Track></Placemark>
+    <Placemark><name>GPS</name><gx:Track><altitudeMode>absolute</altitudeMode><when>2026-01-01T00:00:00Z</when><when>2026-01-01T00:01:00Z</when><gx:coord>1 2 3</gx:coord><gx:coord>4 5 6</gx:coord></gx:Track></Placemark>
   </Folder></Folder>
 </Document></kml>

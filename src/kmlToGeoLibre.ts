@@ -176,6 +176,51 @@ interface DeckPickingInfo {
   object?: { properties?: Record<string, unknown> };
 }
 
+function terrainElevation(map: MapLike, longitude: number, latitude: number): number {
+  const elevation = map.queryTerrainElevation?.([longitude, latitude], { exaggerated: false });
+  return Number.isFinite(elevation) ? elevation! : 0;
+}
+
+function deckPosition(position: Position, altitudeMode: unknown, map: MapLike): Position {
+  const [longitude = 0, latitude = 0, altitude = 0] = position;
+  const ground = terrainElevation(map, longitude, latitude);
+  if (altitudeMode === "absolute") return [longitude, latitude, Number.isFinite(altitude) ? altitude : 0];
+  if (altitudeMode === "relativeToGround" || altitudeMode === "relativeToSeaFloor") {
+    return [longitude, latitude, ground + (Number.isFinite(altitude) ? altitude : 0)];
+  }
+  return [longitude, latitude, ground];
+}
+
+function geometryForDeck(geometry: Geometry, altitudeMode: unknown, map: MapLike): Geometry {
+  if (geometry.type === "GeometryCollection") {
+    return { ...geometry, geometries: geometry.geometries.map((child) => geometryForDeck(child, altitudeMode, map)) };
+  }
+  const transform = (value: unknown): unknown => {
+    if (!Array.isArray(value)) return value;
+    if (typeof value[0] === "number" && typeof value[1] === "number") return deckPosition(value as Position, altitudeMode, map);
+    return value.map(transform);
+  };
+  return { ...geometry, coordinates: transform(geometry.coordinates) } as Geometry;
+}
+
+function pointExtrusionGeometry(geometry: Geometry, map: MapLike): Geometry | null {
+  const lines: Position[][] = [];
+  const collect = (item: Geometry): void => {
+    if (item.type === "Point") {
+      const [longitude = 0, latitude = 0, altitude = 0] = item.coordinates;
+      const ground = terrainElevation(map, longitude, latitude);
+      if (altitude !== ground) lines.push([[longitude, latitude, ground], [longitude, latitude, altitude]]);
+    } else if (item.type === "MultiPoint") {
+      for (const coordinates of item.coordinates) collect({ type: "Point", coordinates });
+    } else if (item.type === "GeometryCollection") {
+      for (const child of item.geometries) collect(child);
+    }
+  };
+  collect(geometry);
+  if (!lines.length) return null;
+  return lines.length === 1 ? { type: "LineString", coordinates: lines[0]! } : { type: "MultiLineString", coordinates: lines };
+}
+
 function geometryWithoutPoints(geometry: Geometry): Geometry | null {
   if (geometry.type === "Point" || geometry.type === "MultiPoint") return null;
   if (geometry.type !== "GeometryCollection") return geometry;
@@ -239,14 +284,19 @@ async function addDeck3dLayers(
   }));
 
   for (const item of prepared) {
-    const nonPointGeometry = geometryWithoutPoints(item.feature.geometry);
+    const deckGeometry = geometryForDeck(item.feature.geometry, item.feature.properties.altitudeMode, map);
+    const nonPointGeometry = geometryWithoutPoints(deckGeometry);
     if (nonPointGeometry) nonPointFeatures.push({ ...item.feature, geometry: nonPointGeometry });
+    if (item.feature.properties.extrude === true) {
+      const extrusion = pointExtrusionGeometry(deckGeometry, map);
+      if (extrusion) nonPointFeatures.push({ ...item.feature, geometry: extrusion });
+    }
     let pointHex = item.style?.iconColor?.hex;
     if (!pointHex && item.style?.iconHref) {
       pointHex = imageColors.get(item.style.iconHref);
     }
     addDeckPoints(
-      item.feature.geometry,
+      deckGeometry,
       item.feature.properties,
       rgbaColor(pointHex, item.style?.iconColor?.opacity ?? 0.95),
       Math.max(4, 12 * (item.style?.iconScale ?? 1)),

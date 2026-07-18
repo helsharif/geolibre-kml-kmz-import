@@ -46,6 +46,9 @@ export interface KmlFeatureProperties extends Record<string, unknown> {
   __kmlStyle?: KmlStyle;
   __kmlVisible?: boolean;
   altitudeMode?: string;
+  altitudeOffset?: number;
+  extrude?: boolean;
+  tessellate?: boolean;
 }
 
 export type KmlFeature = Feature<Geometry, KmlFeatureProperties>;

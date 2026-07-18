@@ -69,7 +69,7 @@ describe("KML parser", () => {
   });
 
   it("preserves per-track timestamps in gx:MultiTrack", async () => {
-    const xml = `<kml xmlns:gx="http://www.google.com/kml/ext/2.2"><Placemark><gx:MultiTrack><gx:Track><when>2026-01-01</when><when>2026-01-02</when><gx:coord>0 0</gx:coord><gx:coord>1 1</gx:coord></gx:Track><gx:Track><when>2026-02-01</when><when>2026-02-02</when><gx:coord>2 2</gx:coord><gx:coord>3 3</gx:coord></gx:Track></gx:MultiTrack></Placemark></kml>`;
+    const xml = `<kml xmlns:gx="http://www.google.com/kml/ext/2.2"><Placemark><gx:MultiTrack><gx:Track><altitudeMode>absolute</altitudeMode><when>2026-01-01</when><when>2026-01-02</when><gx:coord>0 0</gx:coord><gx:coord>1 1</gx:coord></gx:Track><gx:Track><altitudeMode>absolute</altitudeMode><when>2026-02-01</when><when>2026-02-02</when><gx:coord>2 2</gx:coord><gx:coord>3 3</gx:coord></gx:Track></gx:MultiTrack></Placemark></kml>`;
     const result = await parseKml(xml, { sourceFilename: "multi-track.kml" });
     expect(result.featureCollection.features).toHaveLength(2);
     expect(result.featureCollection.features.map((feature) => feature.properties.trackWhen)).toEqual([["2026-01-01", "2026-01-02"], ["2026-02-01", "2026-02-02"]]);

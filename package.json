@@ -1,6 +1,6 @@
 {
   "name": "geolibre-kml-kmz-import",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Production-oriented KML and KMZ import plugin for GeoLibre.",
   "type": "module",
   "scripts": {

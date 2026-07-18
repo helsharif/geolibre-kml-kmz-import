@@ -2,7 +2,7 @@
 
 A standalone GeoLibre plugin for opening Google Earth `.kml` and `.kmz` files as usable map layers. It imports common 2D geometry, folder metadata, attributes, shared styles, embedded marker icons, GroundOverlays, time data, and selected `gx` extensions while degrading safely when a KML feature cannot be represented by GeoLibre.
 
-Version `0.2.2` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
+Version `0.2.3` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
 
 ## Highlights
 
@@ -14,6 +14,7 @@ Version `0.2.2` targets the current external-plugin contract documented by GeoLi
 - Google-Earth-style marker clicks with compact, striped attribute cards and meaningful feature titles
 - Automatic extraction of common two-column HTML description tables into clean, searchable attributes
 - Native deck.gl 3D rendering for altitude-bearing point symbols and ground stems, with point and line information cards
+- Standards-driven altitude handling for omitted, clamped, absolute, relative-to-ground, and `gx` sea-floor modes, including `gx:altitudeOffset` and point extrusion
 - KML folder visibility honored by default, with an option to include deliberately hidden features
 - Private render metadata kept out of GeoLibre Identify results and exports
 - GroundOverlay with LatLonBox, rotation approximation, draw order, alpha, and `gx:LatLonQuad`
@@ -27,11 +28,11 @@ See [KML_COMPATIBILITY.md](KML_COMPATIBILITY.md) for the detailed matrix.
 
 ## Install in GeoLibre
 
-1. Download `kml-kmz-import-0.2.2.zip` from the repository release or build it as described below.
+1. Download `kml-kmz-import-0.2.3.zip` from the repository release or build it as described below.
 2. Open GeoLibre.
 3. Open **Settings → Manage Plugins → Settings**.
 4. Select **Install from file**.
-5. Choose `kml-kmz-import-0.2.2.zip`.
+5. Choose `kml-kmz-import-0.2.3.zip`.
 6. Activate **KML / KMZ Import** from the Plugins menu if it is not already active.
 7. Use the **KML / KMZ** toolbar menu, the small **KML** map button, or the importer panel.
 
@@ -61,7 +62,7 @@ npm run validate:package
 The installable archive is written to:
 
 ```text
-geolibre-plugin/kml-kmz-import-0.2.2.zip
+geolibre-plugin/kml-kmz-import-0.2.3.zip
 ```
 
 `npm run package:geolibre` runs the production build first. The bundle is a self-contained ESM entry; GeoLibre's external-plugin loader does not resolve relative JavaScript imports inside the ZIP.
@@ -121,7 +122,7 @@ Browser engines differ from jsdom. Parsing currently runs on the UI thread; very
 - Remote relative assets inside a fetched NetworkLink are not yet resolved.
 - NetworkLink refresh/view-refresh semantics are not implemented.
 - 3D Model/COLLADA, tours, ScreenOverlay, and PhotoOverlay are detected and reported, not rendered.
-- Nonzero altitude coordinates use GeoLibre's host-provided deck.gl modules to render billboard point symbols and ground stems at their true Z values. Older hosts retain Z values but fall back to flat rendering.
+- KML altitude behavior is selected from each geometry's `altitudeMode`, never from its filename or folder name. Omitted and clamped modes ignore coordinate Z; absolute modes retain sea-level Z; relative modes add available GeoLibre terrain elevation; and `gx:altitudeOffset` is applied before rendering. Older hosts retain the parsed data but fall back to flat rendering.
 - KML regions/LOD, cameras, and LookAt are retained as metadata where attached to a Placemark; view behavior is not reproduced.
 
 ## Test data

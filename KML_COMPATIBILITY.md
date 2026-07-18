@@ -12,8 +12,8 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 | LinearRing | ✅ | Used for Polygon outer and inner boundaries |
 | Polygon | ✅ | Outer ring and all valid holes retained |
 | MultiGeometry | ✅ | Like geometries combined; mixed geometries emitted as sibling features with shared attributes |
-| Geometry altitude | ✅ | Nonzero Z values, billboard point symbols, and ground stems use GeoLibre's host-provided deck.gl modules; older hosts fall back to 2D without discarding Z |
-| tessellate / extrude | 🟡 | Original geometry remains usable; 3D display semantics not reproduced |
+| Geometry altitude | ✅ | Omitted/default and explicit clamp modes ignore Z; absolute and relative modes render in 3D; `gx:altitudeOffset` is applied |
+| tessellate / extrude | 🟡 | Point extrusion renders a terrain-connected stem; line/polygon extrusion flags are retained but wall extrusion is not yet reproduced |
 | name, address, phoneNumber, snippet | ✅ | GeoJSON properties |
 | visibility / open | 🟡 | Effective Document/Folder/Placemark visibility is honored by default; hidden features can be included from the importer; `open` is preserved as a property |
 | description | ✅ | Two-column tables and bold `Key: Value` info windows become clean fields; other HTML is sanitized; escaped plain text for non-tabular descriptions over 5 MB |
@@ -46,6 +46,7 @@ Legend: ✅ Supported · 🟡 Partially supported · ❌ Not supported · 🔬 E
 ## Environment notes
 
 - Styled native layers require current GeoLibre `getMap` and `registerExternalNativeLayer`. Older hosts receive native GeoJSON with default styling.
+- `relativeToGround` uses GeoLibre's available terrain elevation. `relativeToSeaFloor` currently falls back to terrain/zero because the host does not expose bathymetric sampling; clamp-to-sea-floor likewise uses the available map surface.
 - GroundOverlay depends on direct MapLibre access and is not guaranteed to survive a project restore or basemap style replacement until GeoLibre exposes a native arbitrary image layer API.
 - Desktop Content Security Policy can block remote images from unlisted hosts. Embedded KMZ images use data URLs.
 - Drag-and-drop availability varies on touch/mobile platforms; the file picker remains available.

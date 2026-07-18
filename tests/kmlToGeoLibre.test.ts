@@ -61,6 +61,7 @@ function fakeMap(): { map: MapLike; layers: Record<string, unknown>[]; states: A
       setFeatureState: (target, state) => { states.push({ target, state }); },
       getContainer: () => container,
       getCanvas: () => canvas,
+      queryTerrainElevation: () => 500,
     },
   };
 }
@@ -115,11 +116,17 @@ describe("GeoLibre layer registration", () => {
     visible.properties.__kmlVisible = true;
     visible.properties.__kmlStyle = { iconColor: { raw: "ff0000ff", hex: "#ff0000", opacity: 1, css: "rgba(255, 0, 0, 1)" } };
     visible.properties.Place = "Minahasa, Sulawesi, Indonesia";
+    visible.properties.altitudeMode = "absolute";
+    visible.properties.extrude = true;
     const stem: Feature<Geometry, KmlFeatureProperties> = {
       type: "Feature",
       geometry: { type: "LineString", coordinates: [[120.681, 0.109, 0], [120.681, 0.109, 27_979]] },
-      properties: { name: "Visible stem", folderPath: "Earthquakes / Magnitude 5.8 to 6.2", sourceFilename: "earthquakes.kmz", __kmlVisible: true },
+      properties: { name: "Visible stem", folderPath: "Earthquakes / Magnitude 5.8 to 6.2", sourceFilename: "earthquakes.kmz", __kmlVisible: true, altitudeMode: "absolute" },
     };
+    const relative = point("Relative point", "Completely unrelated folder");
+    relative.geometry = { type: "Point", coordinates: [121, 1, 25] };
+    relative.properties.__kmlVisible = true;
+    relative.properties.altitudeMode = "relativeToGround";
     const hidden = point("Hidden", "Earthquakes / Depth 0 to 10");
     hidden.geometry = { type: "Point", coordinates: [10, 20, 5_000] };
     hidden.properties.__kmlVisible = false;
@@ -131,24 +138,28 @@ describe("GeoLibre layer registration", () => {
       addGeoJsonLayer: vi.fn(() => "fallback"),
     } as unknown as GeoLibreAppAPI;
 
-    const result = await addParsedKmlToGeoLibre(app, parsed([visible, stem, hidden]), "earthquakes.kmz");
+    const result = await addParsedKmlToGeoLibre(app, parsed([visible, stem, relative, hidden]), "earthquakes.kmz");
 
     expect(registrations).toHaveLength(1);
     expect(registrations[0]).toMatchObject({ name: "earthquakes.kmz", opacity: 1 });
     expect(registrations[0]?.nativeLayerIds).toHaveLength(2);
     expect(registrations[0]?.style).toMatchObject({ elevation3dEnabled: true, elevation3dVerticalScale: 1, fillColor: "#ff0000" });
-    expect(registrations[0]?.geojson?.features).toHaveLength(2);
+    expect(registrations[0]?.geojson?.features).toHaveLength(3);
     const pointLayer = layers.find((layer) => String(layer.id).endsWith("-3d-points"));
     expect(pointLayer).toBeDefined();
     const pointDatum = (pointLayer?.data as Array<{ properties: Record<string, unknown> }>)[0];
     (pointLayer?.onClick as (info: Record<string, unknown>) => boolean)({ x: 20, y: 30, object: pointDatum });
     expect(container.querySelector(".kml-feature-card")?.textContent).toContain("Minahasa, Sulawesi, Indonesia");
+    expect((pointLayer?.data as Array<{ position: number[]; properties: Record<string, unknown> }>).find((datum) => datum.properties.name === "Relative point")?.position).toEqual([121, 1, 525]);
+    const geometryLayer = layers.find((layer) => String(layer.id).endsWith("-3d-geometry"));
+    expect(JSON.stringify(geometryLayer?.data)).toContain("27979");
+    expect(JSON.stringify(geometryLayer?.data)).toContain("500");
     expect(result.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(true);
 
     registrations.length = 0;
-    const withHidden = await addParsedKmlToGeoLibre(app, parsed([visible, stem, hidden]), "earthquakes.kmz", { includeHiddenFeatures: true });
+    const withHidden = await addParsedKmlToGeoLibre(app, parsed([visible, stem, relative, hidden]), "earthquakes.kmz", { includeHiddenFeatures: true });
     expect(registrations).toHaveLength(1);
-    expect(registrations[0]?.geojson?.features).toHaveLength(3);
+    expect(registrations[0]?.geojson?.features).toHaveLength(4);
     expect(withHidden.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(false);
   });
 });

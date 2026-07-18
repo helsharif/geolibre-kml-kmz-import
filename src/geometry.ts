@@ -15,42 +15,77 @@ export function parseCoordinates(text?: string): Position[] {
   return text.trim().split(/\s+/).map(parseCoordinateTuple).filter((coordinate): coordinate is Position => Boolean(coordinate));
 }
 
-function altitudeMode(element: Element): string | undefined {
-  return textOf(element, "altitudeMode");
+const ALTITUDE_MODES = new Set(["clampToGround", "relativeToGround", "absolute", "clampToSeaFloor", "relativeToSeaFloor"]);
+
+type GeometryParseResult = Omit<ParsedGeometry, "geometry"> & { geometry?: Geometry };
+
+function normalizedPosition(position: Position, mode: string | undefined, offset: number): Position {
+  const [longitude, latitude, rawAltitude] = position;
+  if (longitude === undefined || latitude === undefined) return position;
+  const effectiveMode = ALTITUDE_MODES.has(mode ?? "") ? mode : "clampToGround";
+  const hasAltitude = rawAltitude !== undefined;
+  if (effectiveMode === "clampToGround" || effectiveMode === "clampToSeaFloor") {
+    if (!hasAltitude || rawAltitude === 0) return position;
+    return [longitude, latitude, 0];
+  }
+  if (offset === 0 && (rawAltitude === undefined || Number.isFinite(rawAltitude))) return position;
+  const altitude = (Number.isFinite(rawAltitude) ? rawAltitude! : 0) + offset;
+  return hasAltitude || offset !== 0 ? [longitude, latitude, altitude] : [longitude, latitude];
 }
 
-function point(element: Element): { geometry?: Point; altitudeMode?: string } {
+function geometryMetadata(element: Element): Pick<ParsedGeometry, "altitudeMode" | "altitudeOffset" | "extrude" | "tessellate"> {
+  const metadata: Pick<ParsedGeometry, "altitudeMode" | "altitudeOffset" | "extrude" | "tessellate"> = {};
+  for (const child of Array.from(element.children)) {
+    const name = localName(child);
+    if (!["altitudeMode", "altitudeOffset", "extrude", "tessellate"].includes(name)) continue;
+    const value = child.textContent?.trim();
+    if (!value) continue;
+    if (name === "altitudeMode") metadata.altitudeMode = value;
+    else if (name === "altitudeOffset") {
+      const offset = Number(value);
+      if (Number.isFinite(offset)) metadata.altitudeOffset = offset;
+    } else if (name === "extrude") metadata.extrude = value === "1" || value.toLowerCase() === "true";
+    else if (name === "tessellate") metadata.tessellate = value === "1" || value.toLowerCase() === "true";
+  }
+  return metadata;
+}
+
+function point(element: Element): GeometryParseResult {
   const coordinate = parseCoordinates(textOf(element, "coordinates"))[0];
-  return { geometry: coordinate ? { type: "Point", coordinates: coordinate } : undefined, altitudeMode: altitudeMode(element) };
+  const metadata = geometryMetadata(element);
+  return { geometry: coordinate ? { type: "Point", coordinates: normalizedPosition(coordinate, metadata.altitudeMode, metadata.altitudeOffset ?? 0) } : undefined, ...metadata };
 }
 
-function lineString(element: Element): { geometry?: LineString; altitudeMode?: string } {
-  const coordinates = parseCoordinates(textOf(element, "coordinates"));
-  return { geometry: coordinates.length >= 2 ? { type: "LineString", coordinates } : undefined, altitudeMode: altitudeMode(element) };
+function lineString(element: Element): GeometryParseResult {
+  const metadata = geometryMetadata(element);
+  const coordinates = parseCoordinates(textOf(element, "coordinates")).map((position) => normalizedPosition(position, metadata.altitudeMode, metadata.altitudeOffset ?? 0));
+  return { geometry: coordinates.length >= 2 ? { type: "LineString", coordinates } : undefined, ...metadata };
 }
 
-function polygon(element: Element): { geometry?: Polygon; altitudeMode?: string } {
+function polygon(element: Element): GeometryParseResult {
+  const metadata = geometryMetadata(element);
   const outer = firstChild(element, "outerBoundaryIs");
   const outerRing = outer ? firstChild(outer, "LinearRing") : undefined;
-  const exterior = outerRing ? parseCoordinates(textOf(outerRing, "coordinates")) : [];
-  if (exterior.length < 4) return { altitudeMode: altitudeMode(element) };
+  const exterior = outerRing ? parseCoordinates(textOf(outerRing, "coordinates")).map((position) => normalizedPosition(position, metadata.altitudeMode, metadata.altitudeOffset ?? 0)) : [];
+  if (exterior.length < 4) return metadata;
   const holes = childrenNamed(element, "innerBoundaryIs")
     .map((boundary) => firstChild(boundary, "LinearRing"))
     .filter((ring): ring is Element => Boolean(ring))
-    .map((ring) => parseCoordinates(textOf(ring, "coordinates")))
+    .map((ring) => parseCoordinates(textOf(ring, "coordinates")).map((position) => normalizedPosition(position, metadata.altitudeMode, metadata.altitudeOffset ?? 0)))
     .filter((ring) => ring.length >= 4);
-  return { geometry: { type: "Polygon", coordinates: [exterior, ...holes] }, altitudeMode: altitudeMode(element) };
+  return { geometry: { type: "Polygon", coordinates: [exterior, ...holes] }, ...metadata };
 }
 
-function track(element: Element): { geometry?: LineString; altitudeMode?: string; trackWhen?: string[] } {
+function track(element: Element): GeometryParseResult {
+  const metadata = geometryMetadata(element);
   const coordinates = childrenNamed(element, "coord")
     .map((item) => item.textContent?.trim().split(/\s+/).map(Number) ?? [])
     .filter((values) => values.length >= 2 && values.every(Number.isFinite))
-    .map((values) => values as Position);
+    .map((values) => normalizedPosition(values as Position, metadata.altitudeMode, metadata.altitudeOffset ?? 0));
   const trackWhen = childrenNamed(element, "when").map((item) => item.textContent?.trim() ?? "");
   return {
     geometry: coordinates.length >= 2 ? { type: "LineString", coordinates } : undefined,
-    altitudeMode: altitudeMode(element),
+    ...metadata,
     trackWhen,
   };
 }
@@ -58,6 +93,9 @@ function track(element: Element): { geometry?: LineString; altitudeMode?: string
 export interface ParsedGeometry {
   geometry: Geometry;
   altitudeMode?: string;
+  altitudeOffset?: number;
+  extrude?: boolean;
+  tessellate?: boolean;
   trackWhen?: string[];
 }
 
@@ -69,12 +107,15 @@ export function parseGeometryElements(parent: Element, warnings: ImportWarning[]
       for (const child of Array.from(element.children)) visit(child);
       return;
     }
-    let result: { geometry?: Geometry; altitudeMode?: string; trackWhen?: string[] } | undefined;
+    let result: GeometryParseResult | undefined;
     if (name === "Point") result = point(element);
     if (name === "LineString") result = lineString(element);
     if (name === "Polygon") result = polygon(element);
     if (name === "Track") result = track(element);
     if (!result) return;
+    if (result.altitudeMode && !ALTITUDE_MODES.has(result.altitudeMode)) {
+      warnings.push({ code: "partial-support", message: `Unknown altitudeMode “${result.altitudeMode}” was treated as clampToGround.` });
+    }
     if (result.geometry) parsed.push(result as ParsedGeometry);
     else warnings.push({ code: "invalid-geometry", message: `A malformed ${name} geometry was skipped.` });
   };
@@ -90,16 +131,29 @@ export function combineLikeGeometries(geometries: ParsedGeometry[]): ParsedGeome
   if (geometries.some((entry) => entry.trackWhen)) return geometries;
   const types = new Set(geometries.map((entry) => entry.geometry.type));
   if (types.size !== 1) return geometries;
-  const altitude = geometries.find((entry) => entry.altitudeMode)?.altitudeMode;
+  const metadataSignatures = new Set(geometries.map((entry) => JSON.stringify([
+    entry.altitudeMode,
+    entry.altitudeOffset,
+    entry.extrude,
+    entry.tessellate,
+  ])));
+  if (metadataSignatures.size !== 1) return geometries;
+  const metadata = geometries.find((entry) => entry.altitudeMode || entry.altitudeOffset !== undefined || entry.extrude !== undefined || entry.tessellate !== undefined);
+  const common = metadata ? {
+    altitudeMode: metadata.altitudeMode,
+    altitudeOffset: metadata.altitudeOffset,
+    extrude: metadata.extrude,
+    tessellate: metadata.tessellate,
+  } : {};
   const type = geometries[0]?.geometry.type;
   if (type === "Point") {
-    return [{ geometry: { type: "MultiPoint", coordinates: geometries.map((entry) => (entry.geometry as Point).coordinates) } as MultiPoint, altitudeMode: altitude }];
+    return [{ geometry: { type: "MultiPoint", coordinates: geometries.map((entry) => (entry.geometry as Point).coordinates) } as MultiPoint, ...common }];
   }
   if (type === "LineString") {
-    return [{ geometry: { type: "MultiLineString", coordinates: geometries.map((entry) => (entry.geometry as LineString).coordinates) } as MultiLineString, altitudeMode: altitude }];
+    return [{ geometry: { type: "MultiLineString", coordinates: geometries.map((entry) => (entry.geometry as LineString).coordinates) } as MultiLineString, ...common }];
   }
   if (type === "Polygon") {
-    return [{ geometry: { type: "MultiPolygon", coordinates: geometries.map((entry) => (entry.geometry as Polygon).coordinates) } as MultiPolygon, altitudeMode: altitude }];
+    return [{ geometry: { type: "MultiPolygon", coordinates: geometries.map((entry) => (entry.geometry as Polygon).coordinates) } as MultiPolygon, ...common }];
   }
   return geometries;
 }

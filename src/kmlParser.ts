@@ -133,6 +133,9 @@ export async function parseKml(xml: string, options: ParseOptions): Promise<Pars
         for (const item of parsed) {
           const itemProperties = { ...properties };
           if (item.altitudeMode) itemProperties.altitudeMode = item.altitudeMode;
+          if (item.altitudeOffset !== undefined) itemProperties.altitudeOffset = item.altitudeOffset;
+          if (item.extrude !== undefined) itemProperties.extrude = item.extrude;
+          if (item.tessellate !== undefined) itemProperties.tessellate = item.tessellate;
           if (item.trackWhen) itemProperties.trackWhen = item.trackWhen;
           features.push({ type: "Feature", geometry: item.geometry, properties: itemProperties });
         }
