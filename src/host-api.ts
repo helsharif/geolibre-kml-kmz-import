@@ -33,7 +33,7 @@ export interface GeoLibreControl {
 export interface ExternalLayerRegistration {
   id: string;
   name: string;
-  type?: "geojson" | "raster";
+  type?: "geojson" | "raster" | "pmtiles";
   source?: Record<string, unknown>;
   geojson?: FeatureCollection;
   nativeLayerIds: string[];

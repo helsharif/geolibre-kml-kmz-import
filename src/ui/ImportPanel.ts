@@ -39,7 +39,7 @@ export class ImportPanel {
     const hiddenCheckbox = document.createElement("input");
     hiddenCheckbox.type = "checkbox";
     hiddenCheckbox.addEventListener("change", () => { this.includeHiddenFeatures = hiddenCheckbox.checked; });
-    hiddenLabel.append(hiddenCheckbox, document.createTextNode(" Include items marked hidden in the KML"));
+    hiddenLabel.append(hiddenCheckbox, document.createTextNode(" Include vector features marked hidden in the KML"));
     const security = document.createElement("p");
     security.className = "kml-import-note";
     security.textContent = "Safety limits: 100 MB input, 2,000 archive files, 250 MB extracted, no scripts or unsafe URL schemes.";

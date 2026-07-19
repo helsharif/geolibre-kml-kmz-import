@@ -2,7 +2,7 @@
 
 A standalone GeoLibre plugin for opening Google Earth `.kml` and `.kmz` files as usable map layers. It imports common 2D geometry, folder metadata, attributes, shared styles, embedded marker icons, GroundOverlays, time data, and selected `gx` extensions while degrading safely when a KML feature cannot be represented by GeoLibre.
 
-Version `0.2.4` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
+Version `0.3.1` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
 
 ## Highlights
 
@@ -15,9 +15,9 @@ Version `0.2.4` targets the current external-plugin contract documented by GeoLi
 - Automatic extraction of common two-column HTML description tables into clean, searchable attributes
 - Native deck.gl 3D rendering for altitude-bearing point symbols and ground stems, with point and line information cards
 - Standards-driven altitude handling for omitted, clamped, absolute, relative-to-ground, and `gx` sea-floor modes, including `gx:altitudeOffset` and point extrusion
-- KML folder visibility honored by default, with an option to include deliberately hidden features and overlays
+- KML folder visibility honored by default for vectors, with an option to include deliberately hidden vector features
 - Private render metadata kept out of GeoLibre Identify results and exports
-- GroundOverlay with LatLonBox, rotation approximation, draw order, alpha, and `gx:LatLonQuad`; large/global images are tiled across the globe under one logical layer
+- GroundOverlay with LatLonBox, rotation, draw order, alpha, and `gx:LatLonQuad`; images are reprojected locally into one in-memory PMTiles/PNG raster archive that follows the globe as a normal GeoLibre raster layer
 - TimeStamp, TimeSpan, `gx:Track`, and `gx:MultiTrack` timestamps preserved as attributes
 - Optional, bounded NetworkLink loading for HTTPS and in-archive KML/KMZ resources
 - Detection and non-fatal warnings for models, tours, screen/photo overlays, and other unsupported content
@@ -28,11 +28,11 @@ See [KML_COMPATIBILITY.md](KML_COMPATIBILITY.md) for the detailed matrix.
 
 ## Install in GeoLibre
 
-1. Download `kml-kmz-import-0.2.4.zip` from the repository release or build it as described below.
+1. Download `kml-kmz-import-0.3.1.zip` from the repository release or build it as described below.
 2. Open GeoLibre.
 3. Open **Settings → Manage Plugins → Settings**.
 4. Select **Install from file**.
-5. Choose `kml-kmz-import-0.2.4.zip`.
+5. Choose `kml-kmz-import-0.3.1.zip`.
 6. Activate **KML / KMZ Import** from the Plugins menu if it is not already active.
 7. Use the **KML / KMZ** toolbar menu, the small **KML** map button, or the importer panel.
 
@@ -62,7 +62,7 @@ npm run validate:package
 The installable archive is written to:
 
 ```text
-geolibre-plugin/kml-kmz-import-0.2.4.zip
+geolibre-plugin/kml-kmz-import-0.3.1.zip
 ```
 
 `npm run package:geolibre` runs the production build first. The bundle is a self-contained ESM entry; GeoLibre's external-plugin loader does not resolve relative JavaScript imports inside the ZIP.
@@ -78,13 +78,20 @@ The parser is deliberately modular:
 - `src/geometry.ts` — coordinate and GeoJSON geometry conversion
 - `src/styleParser.ts` — KML colors, styles, StyleMaps
 - `src/groundOverlayParser.ts` — image bounds and quadrilaterals
-- `src/groundOverlayTiles.ts` — globe-safe polar clipping, antimeridian splitting, and image tiling
+- `src/groundOverlayRasterTiles.ts` — Web Mercator reprojection, antimeridian wrapping, and multi-resolution XYZ PNG raster-pyramid conversion
+- `src/rasterPmtiles.ts` — compact PMTiles v3 archive creation for the converted PNG tiles
 - `src/networkLinkParser.ts` / `src/importer.ts` — detection and bounded loading
-- `src/kmlToGeoLibre.ts` — styled native layers, image overlays, bounds fitting
+- `src/kmlToGeoLibre.ts` — styled GeoJSON layers, native PMTiles raster registration, grouping, and bounds fitting
 - `src/featureInfo.ts` — safe Google-Earth-style feature information cards
 - `src/ui/` — GeoLibre control and plain-DOM right panel
 
 GeoLibre's current API provides `registerToolbarMenu`, `registerRightPanel`, `addGeoJsonLayer`, `registerExternalNativeLayer`, `getMap`, and `fitBounds`. The plugin uses the native external-layer registry when available and falls back to `addGeoJsonLayer` on older hosts. Details are in [GEOLIBRE_API_NOTES.md](GEOLIBRE_API_NOTES.md).
+
+## Imported-data storage
+
+Locally selected KML/KMZ files are read into memory and are not copied, extracted, or downloaded into a plugin data directory. Embedded assets are resolved in memory, and each converted GroundOverlay is held in a temporary `blob:`-backed PMTiles archive that is revoked when the plugin unloads. Consequently, raster overlays must currently be re-imported after GeoLibre restarts.
+
+When optional linked HTTPS resource loading is enabled, the plugin fetches linked KML/KMZ content into memory and does not deliberately save it. The browser or desktop webview may still apply its normal HTTP caching policy.
 
 ## Security
 
@@ -116,10 +123,10 @@ Browser engines differ from jsdom. Parsing currently runs on the UI thread; very
 
 ## Known limitations
 
-- GeoLibre has no native arbitrary georeferenced image registration helper. GroundOverlays use `getMap()` and a MapLibre image source, then register the existing layer with GeoLibre. They work in the current session, but exact project restore and style-reload persistence depend on host support.
+- GroundOverlays are converted in memory to a globe-compatible PMTiles v3 archive containing PNG XYZ tiles, rather than GeoTIFF/COG. GeoLibre's COG renderer is Mercator/deck.gl based, while its PMTiles raster path uses native MapLibre raster tiles that drape onto the active globe. The temporary `blob:` archive survives style changes during the active session but cannot survive an application restart.
 - GeoLibre's core supports layer groups, but the current external-plugin API does not expose group creation. The plugin therefore consolidates all vector features from each KML/KMZ into one file-named layer and preserves folder paths as attributes. A forward-compatible `addLayerGroup` hook is used only when a file also needs separate overlay layers and a future host exposes it.
 - Data-driven KML paint and custom icons are created directly in MapLibre. Older GeoLibre hosts receive default vector styling.
-- Rotated LatLonBox overlays use a geographic-coordinate approximation. `gx:LatLonQuad` is exact in 2D.
+- Rotated LatLonBox and `gx:LatLonQuad` overlays use inverse bilinear sampling into the raster pyramid. Pixels outside Web Mercator's finite latitude range are clipped near ±85.05°.
 - Remote relative assets inside a fetched NetworkLink are not yet resolved.
 - NetworkLink refresh/view-refresh semantics are not implemented.
 - 3D Model/COLLADA, tours, ScreenOverlay, and PhotoOverlay are detected and reported, not rendered.
@@ -133,7 +140,7 @@ Small redistribution-safe fixtures live in `test-data/kml-kmz/synthetic/`. The l
 ## Next recommendations
 
 1. Move ZIP/XML parsing and sanitization into a Web Worker with cancellable progress messages.
-2. Add a GeoLibre-native arbitrary image/quad layer API so GroundOverlays persist and restyle like other raster layers.
+2. Add a public GeoLibre local-PMTiles registration API with durable project asset storage so converted GroundOverlays survive application restarts.
 3. Add host-level data-driven vector paint/icon registration and layer-group creation to preserve styles and organization across project restore.
 4. Resolve relative assets for remote NetworkLinks with origin-aware URL bases and stricter allowlists.
 5. Add refresh semantics, user-controlled domain allowlists, and a linked-resource preview.

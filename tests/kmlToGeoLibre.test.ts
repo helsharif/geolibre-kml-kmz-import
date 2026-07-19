@@ -4,10 +4,24 @@ import type { ExternalLayerRegistration, GeoLibreAppAPI, GeoLibreDeckGL, MapLike
 import { addParsedKmlToGeoLibre } from "../src/kmlToGeoLibre";
 import type { KmlFeatureProperties, ParsedKml } from "../src/types";
 
-function parsed(features: Array<Feature<Geometry, KmlFeatureProperties>>, withOverlay = false): ParsedKml {
+vi.mock("../src/groundOverlayRasterTiles", () => ({
+  materializeRasterTilePyramid: vi.fn(async () => ({
+    tileSize: 512,
+    targetZoom: 0,
+    bounds: [-180, -85.0511287798066, 180, 85.0511287798066],
+    tiles: [{ z: 0, x: 0, y: 0, rawX: 0, bounds: [-180, -85.0511287798066, 180, 85.0511287798066], imageUrl: "data:image/png;base64,tile" }],
+  })),
+}));
+
+vi.mock("../src/rasterPmtiles", () => ({
+  createRasterPmtilesUrl: vi.fn(() => ({ url: "blob:converted-overlay.pmtiles", byteLength: 1234 })),
+  releaseRasterPmtilesUrl: vi.fn(),
+}));
+
+function parsed(features: Array<Feature<Geometry, KmlFeatureProperties>>, withOverlay = false, overlayVisible = true): ParsedKml {
   return {
     featureCollection: { type: "FeatureCollection", features },
-    overlays: withOverlay ? [{ name: "Overlay", imageUrl: "data:image/png;base64,AA==", bounds: [0, 0, 2, 2], coordinates: [[0, 2], [2, 2], [2, 0], [0, 0]], rotation: 0, drawOrder: 0, opacity: 1, folderPath: "", visible: true }] : [],
+    overlays: withOverlay ? [{ name: "Overlay", imageUrl: "data:image/png;base64,AA==", bounds: [0, 0, 2, 2], coordinates: [[0, 2], [2, 2], [2, 0], [0, 0]], rotation: 0, drawOrder: 0, opacity: 1, folderPath: "", visible: overlayVisible }] : [],
     networkLinks: [], models: [], warnings: [], documentName: "Document",
     summary: { points: features.length, lines: 0, polygons: 0, groundOverlays: withOverlay ? 1 : 0, folders: 2, styles: 1, models: 0, networkLinks: 0, features: features.length },
   };
@@ -106,6 +120,36 @@ describe("GeoLibre layer registration", () => {
     const result = await addParsedKmlToGeoLibre(app, parsed([point("A", "Folder A")], true), "overlay.kmz");
     expect(result.layerIds).toHaveLength(2);
     expect(result.warnings.some((warning) => warning.message.includes("cannot create layer groups"))).toBe(true);
+  });
+
+  it("imports a hidden GroundOverlay as an independent raster without enabling hidden vectors", async () => {
+    const { map } = fakeMap();
+    const registrations: ExternalLayerRegistration[] = [];
+    const hidden = point("Hidden vector", "Folder");
+    hidden.properties.__kmlVisible = false;
+    const app = {
+      getMap: () => map,
+      registerExternalNativeLayer: (layer: ExternalLayerRegistration) => { registrations.push(layer); },
+      fitBounds: vi.fn(),
+      addGeoJsonLayer: vi.fn(() => "fallback"),
+    } as unknown as GeoLibreAppAPI;
+
+    const result = await addParsedKmlToGeoLibre(app, parsed([hidden], true, false), "overlay.kmz");
+
+    expect(registrations).toHaveLength(2);
+    expect(registrations.find((layer) => layer.type === "geojson")?.geojson?.features).toHaveLength(0);
+    expect(registrations.find((layer) => layer.type === "pmtiles")).toMatchObject({
+      sourcePath: "blob:converted-overlay.pmtiles",
+      source: { type: "raster", url: "blob:converted-overlay.pmtiles" },
+      metadata: {
+      sourceKind: "pmtiles-url",
+      externalNativeLayer: true,
+      tileType: "raster",
+      convertedFormat: "pmtiles-png",
+      originalVisibility: false,
+      },
+    });
+    expect(result.warnings.some((warning) => warning.message.includes("marked hidden"))).toBe(true);
   });
 
   it("uses one native 3D layer for points and stems, restores point information, and omits hidden features by default", async () => {

@@ -9,7 +9,7 @@ describe("GroundOverlay", () => {
     const result = await parseKml(xml, { sourceFilename: "overlay.kml", assetResolver: { resolve: async () => "data:image/png;base64,AA==" } });
     expect(result.overlays[0]).toMatchObject({ bounds: [-80, 40, -70, 45], rotation: 15, drawOrder: 2, opacity: 128 / 255, imageUrl: "data:image/png;base64,AA==", visible: true });
     expect(result.overlays[0]?.coordinates).toHaveLength(4);
-    expect(result.warnings.some((warning) => warning.message.includes("rotated"))).toBe(true);
+    expect(result.warnings.some((warning) => warning.message.includes("rotated"))).toBe(false);
   });
 
   it("supports gx:LatLonQuad coordinate order", async () => {

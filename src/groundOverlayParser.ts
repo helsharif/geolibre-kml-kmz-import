@@ -45,7 +45,6 @@ export async function parseGroundOverlay(element: Element, folderPath: string, o
   const imageUrl = href ? await options.assetResolver?.resolve(href, options.basePath) : undefined;
   if (href && !imageUrl) warnings.push({ code: "missing-asset", message: `GroundOverlay image could not be resolved: ${href}` });
   if (!href) warnings.push({ code: "missing-asset", message: "A GroundOverlay has no image href." });
-  if (rotation !== 0) warnings.push({ code: "partial-support", message: "A rotated GroundOverlay was approximated with MapLibre image-source coordinates." });
   const color = convertKmlColor(textOf(element, "color"));
   return {
     name: textOf(element, "name") ?? "Ground overlay",
