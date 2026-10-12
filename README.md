@@ -2,7 +2,7 @@
 
 A standalone GeoLibre plugin for opening Google Earth `.kml` and `.kmz` files as usable map layers. It imports common 2D geometry, folder metadata, attributes, shared styles, embedded marker icons, GroundOverlays, time data, and selected `gx` extensions while degrading safely when a KML feature cannot be represented by GeoLibre.
 
-Version `0.3.1` targets the current external-plugin contract documented by GeoLibre on 2026-07-18.
+Version `0.3.1` uses GeoLibre's release ZIP registry submission format.
 
 ## Highlights
 
@@ -40,8 +40,8 @@ GeoLibre accepts a ZIP with `plugin.json` at the archive root. This repository's
 
 ```text
 plugin.json
-dist/index.js
-dist/style.css
+index.js
+style.css
 ```
 
 For local development, GeoLibre can also scan the unpacked `geolibre-plugin/` directory through its additional plugin directories setting.
@@ -66,6 +66,14 @@ geolibre-plugin/kml-kmz-import-0.3.1.zip
 ```
 
 `npm run package:geolibre` runs the production build first. The bundle is a self-contained ESM entry; GeoLibre's external-plugin loader does not resolve relative JavaScript imports inside the ZIP.
+
+## Publish to the plugin registry
+
+After validating the package, attach `geolibre-plugin/kml-kmz-import-0.3.1.zip` to the GitHub release tagged `v0.3.1` in this repository. The package command also writes `geolibre-plugin/kml-kmz-import.json`, containing the release URL and SHA-256 of that exact ZIP.
+
+Submit only that JSON file as `registry/kml-kmz-import.json` to `opengeos/geolibre-plugins`. Use the supported `Data` and `Vector` categories. Do not submit built plugin code, `plugin-registry.json`, or `docs/plugins.md`; the registry generates those during deployment. See the [submission guide](https://plugins.geolibre.app/develop/).
+
+For future releases, update the version in `package.json`, `package-lock.json`, `geolibre-plugin/plugin.json`, and `src/geolibre.ts` before packaging. Always publish the ZIP used to generate the registry hash; rebuilding can change the archive's bytes.
 
 ## Architecture
 

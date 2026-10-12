@@ -2,6 +2,9 @@ node_modules/
 example_netcdf_files/
 geolibre-plugin/dist/
 geolibre-plugin/*.zip
+geolibre-plugin/index.js
+geolibre-plugin/style.css
+geolibre-plugin/kml-kmz-import.json
 .vite/
 .geolibre-source/
 notes/
